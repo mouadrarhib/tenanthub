@@ -45,3 +45,7 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+### Local-only tracking docs ###
+ROADMAP.md
+/New folder/
