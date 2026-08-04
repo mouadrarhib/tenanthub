@@ -3,7 +3,6 @@ package com.tenanthub.project.controller;
 import com.tenanthub.project.entity.Project;
 import com.tenanthub.project.exception.ResourceNotFoundException;
 import com.tenanthub.project.service.ProjectService;
-import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -16,9 +15,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -123,17 +119,15 @@ class ProjectControllerTest {
     }
 
     @Test
-    void getProject_notFound_currentlyPropagatesUnhandled() {
-        // No @ControllerAdvice yet - ResourceNotFoundException isn't mapped to a response
-        // status, so MockMvc rethrows it wrapped in a ServletException. Expected to become
-        // a clean isNotFound() assertion once the global error handler lands.
+    void getProject_notFound_returnsNotFound() throws Exception {
         UUID id = UUID.randomUUID();
         when(projectService.getProject(id)).thenThrow(new ResourceNotFoundException("Project not found: " + id));
 
-        ServletException exception = assertThrows(ServletException.class,
-                () -> mockMvc.perform(get("/api/projects/{id}", id)));
-
-        assertThat(exception.getCause()).isInstanceOf(ResourceNotFoundException.class);
+        mockMvc.perform(get("/api/projects/{id}", id))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.message").value("Project not found: " + id))
+                .andExpect(jsonPath("$.path").value("/api/projects/" + id));
     }
 
     @Test

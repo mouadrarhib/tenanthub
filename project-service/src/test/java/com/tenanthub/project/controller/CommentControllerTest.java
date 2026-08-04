@@ -4,7 +4,6 @@ import com.tenanthub.project.entity.Comment;
 import com.tenanthub.project.entity.Task;
 import com.tenanthub.project.exception.ResourceNotFoundException;
 import com.tenanthub.project.service.CommentService;
-import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -17,8 +16,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -95,22 +92,18 @@ class CommentControllerTest {
     }
 
     @Test
-    void createComment_taskNotFound_currentlyPropagatesUnhandled() {
-        // No @ControllerAdvice yet - ResourceNotFoundException isn't mapped to a response
-        // status, so MockMvc rethrows it wrapped in a ServletException.
+    void createComment_taskNotFound_returnsNotFound() throws Exception {
         UUID taskId = UUID.randomUUID();
         UUID authorId = UUID.randomUUID();
         when(commentService.createComment(eq(taskId), eq(authorId), any()))
                 .thenThrow(new ResourceNotFoundException("Task not found: " + taskId));
 
-        ServletException exception = assertThrows(ServletException.class, () -> mockMvc.perform(
-                post("/api/tasks/{taskId}/comments", taskId)
+        mockMvc.perform(post("/api/tasks/{taskId}/comments", taskId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"authorUserId":"%s","content":"Ghost comment"}
-                                """.formatted(authorId))));
-
-        assertThat(exception.getCause()).isInstanceOf(ResourceNotFoundException.class);
+                                """.formatted(authorId)))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -137,14 +130,12 @@ class CommentControllerTest {
     }
 
     @Test
-    void getComment_notFound_currentlyPropagatesUnhandled() {
+    void getComment_notFound_returnsNotFound() throws Exception {
         UUID commentId = UUID.randomUUID();
         when(commentService.getComment(commentId)).thenThrow(new ResourceNotFoundException("Comment not found: " + commentId));
 
-        ServletException exception = assertThrows(ServletException.class,
-                () -> mockMvc.perform(get("/api/comments/{id}", commentId)));
-
-        assertThat(exception.getCause()).isInstanceOf(ResourceNotFoundException.class);
+        mockMvc.perform(get("/api/comments/{id}", commentId))
+                .andExpect(status().isNotFound());
     }
 
     @Test

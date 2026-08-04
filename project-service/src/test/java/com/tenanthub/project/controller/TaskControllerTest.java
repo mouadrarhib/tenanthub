@@ -5,7 +5,6 @@ import com.tenanthub.project.entity.Task;
 import com.tenanthub.project.entity.TaskStatus;
 import com.tenanthub.project.exception.ResourceNotFoundException;
 import com.tenanthub.project.service.TaskService;
-import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -18,8 +17,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -86,21 +83,17 @@ class TaskControllerTest {
     }
 
     @Test
-    void createTask_projectNotFound_currentlyPropagatesUnhandled() {
-        // No @ControllerAdvice yet - ResourceNotFoundException isn't mapped to a response
-        // status, so MockMvc rethrows it wrapped in a ServletException.
+    void createTask_projectNotFound_returnsNotFound() throws Exception {
         UUID projectId = UUID.randomUUID();
         when(taskService.createTask(eq(projectId), any(), any(), any(), any()))
                 .thenThrow(new ResourceNotFoundException("Project not found: " + projectId));
 
-        ServletException exception = assertThrows(ServletException.class, () -> mockMvc.perform(
-                post("/api/projects/{projectId}/tasks", projectId)
+        mockMvc.perform(post("/api/projects/{projectId}/tasks", projectId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"title":"Ghost task"}
-                                """)));
-
-        assertThat(exception.getCause()).isInstanceOf(ResourceNotFoundException.class);
+                                """))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -127,14 +120,12 @@ class TaskControllerTest {
     }
 
     @Test
-    void getTask_notFound_currentlyPropagatesUnhandled() {
+    void getTask_notFound_returnsNotFound() throws Exception {
         UUID taskId = UUID.randomUUID();
         when(taskService.getTask(taskId)).thenThrow(new ResourceNotFoundException("Task not found: " + taskId));
 
-        ServletException exception = assertThrows(ServletException.class,
-                () -> mockMvc.perform(get("/api/tasks/{id}", taskId)));
-
-        assertThat(exception.getCause()).isInstanceOf(ResourceNotFoundException.class);
+        mockMvc.perform(get("/api/tasks/{id}", taskId))
+                .andExpect(status().isNotFound());
     }
 
     @Test
