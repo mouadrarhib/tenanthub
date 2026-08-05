@@ -6,7 +6,10 @@ spring.datasource.username=postgres
 spring.datasource.password=changeme
 spring.flyway.enabled=true
 
-spring.security.oauth2.resourceserver.jwt.issuer-uri=http://localhost:8081
+# auth-service signs JWTs with jjwt + HS256 using this shared secret (not a real
+# OIDC/OAuth2 issuer, so no issuer-uri/JWK discovery here) - must match auth-service's
+# jwt.secret exactly. project-service's SecurityConfig will build a JwtDecoder from it.
+jwt.secret=changeme-replace-with-a-strong-secret-key
 
 # P1 has no Auth Service wiring yet (that's P2) - disable the default-deny-all
 # security autoconfiguration so the API/Swagger are reachable. Remove this once
