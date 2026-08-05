@@ -8,13 +8,8 @@ spring.flyway.enabled=true
 
 # auth-service signs JWTs with jjwt + HS256 using this shared secret (not a real
 # OIDC/OAuth2 issuer, so no issuer-uri/JWK discovery here) - must match auth-service's
-# jwt.secret exactly. project-service's SecurityConfig will build a JwtDecoder from it.
+# jwt.secret exactly. security/SecurityConfig builds a JwtDecoder from it.
 jwt.secret=changeme-replace-with-a-strong-secret-key
-
-# P1 has no Auth Service wiring yet (that's P2) - disable the default-deny-all
-# security autoconfiguration so the API/Swagger are reachable. Remove this once
-# a real SecurityConfig trusting Auth Service's JWTs is added.
-spring.autoconfigure.exclude=org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration,org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration,org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterAutoConfiguration,org.springframework.boot.security.oauth2.server.resource.autoconfigure.OAuth2ResourceServerAutoConfiguration,org.springframework.boot.security.oauth2.server.resource.autoconfigure.web.OAuth2ResourceServerWebSecurityAutoConfiguration,org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration
 
 spring.kafka.bootstrap-servers=localhost:9092
 

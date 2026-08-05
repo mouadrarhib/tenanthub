@@ -26,9 +26,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Controller unit tests: MockMvc + a mocked ProjectService, no Spring context beyond
- * the web slice, no database. Security filters are disabled here since this project
- * has no SecurityConfig yet (that's P2) - the tests exercise the controller/validation
- * layer only.
+ * the web slice, no database. Security filters are disabled here so these tests stay
+ * scoped to the controller/validation layer, independent of the JWT auth wired up in
+ * security/SecurityConfig.
  */
 @WebMvcTest(ProjectController.class)
 @AutoConfigureMockMvc(addFilters = false)
