@@ -1,14 +1,18 @@
 package com.tenanthub.project.service;
 
+import com.tenanthub.events.TaskAssignedEvent;
+import com.tenanthub.events.TaskCreatedEvent;
 import com.tenanthub.project.entity.Project;
 import com.tenanthub.project.entity.Task;
 import com.tenanthub.project.entity.TaskStatus;
+import com.tenanthub.project.event.TaskEventPublisher;
 import com.tenanthub.project.exception.ResourceNotFoundException;
 import com.tenanthub.project.repository.TaskRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -20,6 +24,7 @@ public class TaskService {
 
     private final TaskRepository taskRepository;
     private final ProjectService projectService;
+    private final TaskEventPublisher eventPublisher;
 
     @Transactional
     public Task createTask(UUID tenantId, UUID projectId, String title, TaskStatus status, UUID assigneeUserId, LocalDate dueDate) {
@@ -33,7 +38,15 @@ public class TaskService {
                 .assigneeUserId(assigneeUserId)
                 .dueDate(dueDate)
                 .build();
-        return taskRepository.save(task);
+        Task saved = taskRepository.save(task);
+
+        eventPublisher.publishTaskCreated(new TaskCreatedEvent(
+                saved.getId(), projectId, tenantId, saved.getTitle(), saved.getAssigneeUserId(), Instant.now()));
+        if (saved.getAssigneeUserId() != null) {
+            eventPublisher.publishTaskAssigned(new TaskAssignedEvent(
+                    saved.getId(), projectId, tenantId, saved.getAssigneeUserId(), Instant.now()));
+        }
+        return saved;
     }
 
     public Task getTask(UUID tenantId, UUID id) {
@@ -49,10 +62,16 @@ public class TaskService {
     @Transactional
     public Task updateTask(UUID tenantId, UUID id, String title, TaskStatus status, UUID assigneeUserId, LocalDate dueDate) {
         Task task = getTask(tenantId, id);
+        UUID previousAssignee = task.getAssigneeUserId();
         task.setTitle(title);
         task.setStatus(status);
         task.setAssigneeUserId(assigneeUserId);
         task.setDueDate(dueDate);
+
+        if (assigneeUserId != null && !assigneeUserId.equals(previousAssignee)) {
+            eventPublisher.publishTaskAssigned(new TaskAssignedEvent(
+                    task.getId(), task.getProject().getId(), tenantId, assigneeUserId, Instant.now()));
+        }
         return task;
     }
 
