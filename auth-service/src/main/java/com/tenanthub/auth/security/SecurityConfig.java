@@ -32,7 +32,7 @@ public class SecurityConfig {
                         // that forward re-enters this filter chain. Without this, an
                         // unauthenticated caller sending malformed JSON to a public endpoint
                         // got a bare 401/403 instead of the intended 400.
-                        .requestMatchers("/api/auth/**", "/actuator/**", "/error",
+                        .requestMatchers("/api/auth/**", "/internal/**", "/actuator/**", "/error",
                                 "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
                         .permitAll()
                         .anyRequest().authenticated());
