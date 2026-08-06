@@ -53,7 +53,11 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/actuator/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
+                        // /error must be public too - a parse/validation failure forwards
+                        // internally to /error to render the response, and that forward
+                        // re-enters this filter chain and gets its own authorization check.
+                        .requestMatchers("/actuator/**", "/error",
+                                "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
                         .permitAll()
                         // Destructive actions need ADMIN; create/read/update just need to be authenticated.
                         .requestMatchers(HttpMethod.DELETE, "/api/**").hasRole("ADMIN")
