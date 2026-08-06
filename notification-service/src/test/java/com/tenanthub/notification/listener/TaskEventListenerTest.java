@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -61,11 +62,12 @@ class TaskEventListenerTest {
     }
 
     @Test
-    void onTaskAssigned_lookupFails_doesNotPropagate() {
+    void onTaskAssigned_lookupFails_propagatesForRetryAndDlt() {
         UUID assigneeUserId = UUID.randomUUID();
         when(authUserClient.findEmail(assigneeUserId)).thenThrow(new RuntimeException("auth-service unreachable"));
+        TaskAssignedEvent event = event(UUID.randomUUID(), assigneeUserId);
 
-        listener.onTaskAssigned(event(UUID.randomUUID(), assigneeUserId));
+        assertThatThrownBy(() -> listener.onTaskAssigned(event)).isInstanceOf(RuntimeException.class);
 
         verify(emailService, never()).send(any(), any(), any());
     }

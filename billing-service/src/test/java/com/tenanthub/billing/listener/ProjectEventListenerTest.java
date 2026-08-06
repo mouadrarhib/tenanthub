@@ -11,6 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Instant;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
@@ -41,10 +42,10 @@ class ProjectEventListenerTest {
     }
 
     @Test
-    void onProjectCreated_serviceThrows_doesNotPropagate() {
+    void onProjectCreated_serviceThrows_propagatesForRetryAndDlt() {
         ProjectCreatedEvent event = event();
         doThrow(new RuntimeException("db unavailable")).when(usageTrackingService).recordProjectCreated(event);
 
-        listener.onProjectCreated(event);
+        assertThatThrownBy(() -> listener.onProjectCreated(event)).isInstanceOf(RuntimeException.class);
     }
 }

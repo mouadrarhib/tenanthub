@@ -17,20 +17,16 @@ public class TaskEventListener {
     private final AuthUserClient authUserClient;
     private final EmailService emailService;
 
-    // Broad catch is deliberate here, unlike the REST GlobalExceptionHandlers elsewhere
-    // in this codebase: a bad/unreachable-dependency event should be logged and skipped,
-    // not left to Spring Kafka's default retry behavior, until the dead-letter topic
-    // step formalizes that.
+    // A missing user is a real business outcome (bad/stale id), not a failure - logged
+    // and skipped, no retry. Anything else (auth-service unreachable, SMTP down) is left
+    // to propagate: KafkaErrorHandlingConfig's DefaultErrorHandler retries it a couple of
+    // times, then routes it to task.assigned.DLT instead of retrying forever.
     @KafkaListener(topics = EventTopics.TASK_ASSIGNED)
     public void onTaskAssigned(TaskAssignedEvent event) {
-        try {
-            authUserClient.findEmail(event.assigneeUserId()).ifPresentOrElse(
-                    email -> emailService.send(email, "You've been assigned a task",
-                            "You've been assigned a new task (id: " + event.taskId() + ")."),
-                    () -> log.warn("No user found for assigneeUserId {} on task {} - skipping notification",
-                            event.assigneeUserId(), event.taskId()));
-        } catch (Exception e) {
-            log.error("Failed to process task.assigned event for task {}", event.taskId(), e);
-        }
+        authUserClient.findEmail(event.assigneeUserId()).ifPresentOrElse(
+                email -> emailService.send(email, "You've been assigned a task",
+                        "You've been assigned a new task (id: " + event.taskId() + ")."),
+                () -> log.warn("No user found for assigneeUserId {} on task {} - skipping notification",
+                        event.assigneeUserId(), event.taskId()));
     }
 }

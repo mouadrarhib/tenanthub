@@ -11,6 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Instant;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
@@ -41,10 +42,10 @@ class TenantEventListenerTest {
     }
 
     @Test
-    void onTenantCreated_serviceThrows_doesNotPropagate() {
+    void onTenantCreated_serviceThrows_propagatesForRetryAndDlt() {
         TenantCreatedEvent event = event();
         doThrow(new RuntimeException("db unavailable")).when(usageTrackingService).recordTenantCreated(event);
 
-        listener.onTenantCreated(event);
+        assertThatThrownBy(() -> listener.onTenantCreated(event)).isInstanceOf(RuntimeException.class);
     }
 }
