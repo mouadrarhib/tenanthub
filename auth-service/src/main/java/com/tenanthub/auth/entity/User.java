@@ -38,8 +38,9 @@ public class User {
     private UUID id;
 
     // Logical link to tenant_db.tenants.id - not a real FK (database-per-service).
-    // TODO(P3): populate once Tenant Service signup flow exists.
-    @Column(name = "tenant_id")
+    // Caller supplies the tenant to join at registration; Tenant Service's signup
+    // flow is what produces a valid id here.
+    @Column(name = "tenant_id", nullable = false)
     private UUID tenantId;
 
     @Column(nullable = false, unique = true)

@@ -31,6 +31,7 @@ public class JwtService {
         return Jwts.builder()
                 .subject(user.getId().toString())
                 .claim("email", user.getEmail())
+                .claim("tenantId", user.getTenantId().toString())
                 .claim("roles", user.getRoles().stream().map(Role::getName).toList())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusMillis(expirationMs)))

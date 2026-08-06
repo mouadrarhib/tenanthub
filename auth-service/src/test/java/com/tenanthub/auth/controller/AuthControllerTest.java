@@ -12,6 +12,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.UUID;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -35,57 +37,72 @@ class AuthControllerTest {
 
     @Test
     void register_returnsCreated() throws Exception {
+        UUID tenantId = UUID.randomUUID();
         when(authService.register(any())).thenReturn(new AuthResponse("signed-jwt"));
 
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email":"jane@tenanthub.com","password":"password123"}
-                                """))
+                                {"email":"jane@tenanthub.com","password":"password123","tenantId":"%s"}
+                                """.formatted(tenantId)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.token").value("signed-jwt"));
     }
 
     @Test
     void register_invalidEmail_returnsBadRequest() throws Exception {
+        UUID tenantId = UUID.randomUUID();
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email":"not-an-email","password":"password123"}
-                                """))
+                                {"email":"not-an-email","password":"password123","tenantId":"%s"}
+                                """.formatted(tenantId)))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     void register_blankEmail_returnsBadRequest() throws Exception {
+        UUID tenantId = UUID.randomUUID();
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email":"","password":"password123"}
-                                """))
+                                {"email":"","password":"password123","tenantId":"%s"}
+                                """.formatted(tenantId)))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     void register_shortPassword_returnsBadRequest() throws Exception {
+        UUID tenantId = UUID.randomUUID();
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email":"jane@tenanthub.com","password":"short"}
+                                {"email":"jane@tenanthub.com","password":"short","tenantId":"%s"}
+                                """.formatted(tenantId)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void register_missingTenantId_returnsBadRequest() throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"jane@tenanthub.com","password":"password123"}
                                 """))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     void register_duplicateEmail_returnsConflict() throws Exception {
+        UUID tenantId = UUID.randomUUID();
         when(authService.register(any()))
                 .thenThrow(new EmailAlreadyExistsException("Email already registered: jane@tenanthub.com"));
 
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email":"jane@tenanthub.com","password":"password123"}
-                                """))
+                                {"email":"jane@tenanthub.com","password":"password123","tenantId":"%s"}
+                                """.formatted(tenantId)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.status").value(409))
                 .andExpect(jsonPath("$.message").value("Email already registered: jane@tenanthub.com"))

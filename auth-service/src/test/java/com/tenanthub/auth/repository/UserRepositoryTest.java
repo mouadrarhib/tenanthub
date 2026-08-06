@@ -35,6 +35,7 @@ class UserRepositoryTest {
     @Test
     void save_persistsGeneratedIdAndCreatedAt() {
         User user = User.builder()
+                .tenantId(UUID.randomUUID())
                 .email("jane-" + UUID.randomUUID() + "@tenanthub.com")
                 .passwordHash("hashed")
                 .build();
@@ -53,6 +54,7 @@ class UserRepositoryTest {
     void save_persistsRolesViaJoinTable() {
         Role role = entityManager.persist(Role.builder().name("TEST_ROLE_" + UUID.randomUUID()).build());
         User user = User.builder()
+                .tenantId(UUID.randomUUID())
                 .email("withrole-" + UUID.randomUUID() + "@tenanthub.com")
                 .passwordHash("hashed")
                 .roles(Set.of(role))
@@ -68,7 +70,8 @@ class UserRepositoryTest {
     @Test
     void findByEmail_found_returnsUser() {
         String email = "found-" + UUID.randomUUID() + "@tenanthub.com";
-        entityManager.persist(User.builder().email(email).passwordHash("hashed").build());
+        entityManager.persist(User.builder().tenantId(UUID.randomUUID())
+                .email(email).passwordHash("hashed").build());
         entityManager.flush();
 
         Optional<User> found = userRepository.findByEmail(email);
@@ -86,7 +89,8 @@ class UserRepositoryTest {
     @Test
     void existsByEmail_true() {
         String email = "exists-" + UUID.randomUUID() + "@tenanthub.com";
-        entityManager.persist(User.builder().email(email).passwordHash("hashed").build());
+        entityManager.persist(User.builder().tenantId(UUID.randomUUID())
+                .email(email).passwordHash("hashed").build());
         entityManager.flush();
 
         assertThat(userRepository.existsByEmail(email)).isTrue();

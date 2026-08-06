@@ -27,25 +27,27 @@ public class ProjectService {
         return projectRepository.save(project);
     }
 
-    public Project getProject(UUID id) {
-        return projectRepository.findById(id)
+    // Not found and "belongs to another tenant" return the same 404 - confirming a
+    // project exists in someone else's tenant is its own leak (see Task/CommentService).
+    public Project getProject(UUID tenantId, UUID id) {
+        return projectRepository.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found: " + id));
     }
 
-    public List<Project> listProjects() {
-        return projectRepository.findAll();
+    public List<Project> listProjects(UUID tenantId) {
+        return projectRepository.findByTenantId(tenantId);
     }
 
     @Transactional
-    public Project updateProject(UUID id, String name, String description) {
-        Project project = getProject(id);
+    public Project updateProject(UUID tenantId, UUID id, String name, String description) {
+        Project project = getProject(tenantId, id);
         project.setName(name);
         project.setDescription(description);
         return project;
     }
 
     @Transactional
-    public void deleteProject(UUID id) {
-        projectRepository.delete(getProject(id));
+    public void deleteProject(UUID tenantId, UUID id) {
+        projectRepository.delete(getProject(tenantId, id));
     }
 }

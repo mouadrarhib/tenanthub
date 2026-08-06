@@ -22,8 +22,10 @@ public class TaskService {
     private final ProjectService projectService;
 
     @Transactional
-    public Task createTask(UUID projectId, String title, TaskStatus status, UUID assigneeUserId, LocalDate dueDate) {
-        Project project = projectService.getProject(projectId);
+    public Task createTask(UUID tenantId, UUID projectId, String title, TaskStatus status, UUID assigneeUserId, LocalDate dueDate) {
+        // Tenant-scoped lookup - a project id from another tenant 404s here rather
+        // than silently attaching a task to a project the caller can't see.
+        Project project = projectService.getProject(tenantId, projectId);
         Task task = Task.builder()
                 .project(project)
                 .title(title)
@@ -34,18 +36,19 @@ public class TaskService {
         return taskRepository.save(task);
     }
 
-    public Task getTask(UUID id) {
-        return taskRepository.findById(id)
+    public Task getTask(UUID tenantId, UUID id) {
+        return taskRepository.findByIdAndProject_TenantId(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found: " + id));
     }
 
-    public List<Task> listTasksByProject(UUID projectId) {
+    public List<Task> listTasksByProject(UUID tenantId, UUID projectId) {
+        projectService.getProject(tenantId, projectId);
         return taskRepository.findByProjectId(projectId);
     }
 
     @Transactional
-    public Task updateTask(UUID id, String title, TaskStatus status, UUID assigneeUserId, LocalDate dueDate) {
-        Task task = getTask(id);
+    public Task updateTask(UUID tenantId, UUID id, String title, TaskStatus status, UUID assigneeUserId, LocalDate dueDate) {
+        Task task = getTask(tenantId, id);
         task.setTitle(title);
         task.setStatus(status);
         task.setAssigneeUserId(assigneeUserId);
@@ -54,7 +57,7 @@ public class TaskService {
     }
 
     @Transactional
-    public void deleteTask(UUID id) {
-        taskRepository.delete(getTask(id));
+    public void deleteTask(UUID tenantId, UUID id) {
+        taskRepository.delete(getTask(tenantId, id));
     }
 }

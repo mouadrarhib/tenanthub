@@ -3,12 +3,15 @@ package com.tenanthub.project.controller;
 import com.tenanthub.project.entity.Comment;
 import com.tenanthub.project.entity.Task;
 import com.tenanthub.project.exception.ResourceNotFoundException;
+import com.tenanthub.project.security.JwtTestSupport;
 import com.tenanthub.project.service.CommentService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -36,6 +39,11 @@ class CommentControllerTest {
     @MockitoBean
     private CommentService commentService;
 
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
+
     private Comment commentFor(UUID taskId, UUID commentId, UUID authorId, String content) {
         return Comment.builder()
                 .id(commentId)
@@ -48,13 +56,15 @@ class CommentControllerTest {
 
     @Test
     void createComment_returnsCreated() throws Exception {
+        UUID tenantId = UUID.randomUUID();
         UUID taskId = UUID.randomUUID();
         UUID authorId = UUID.randomUUID();
         Comment comment = commentFor(taskId, UUID.randomUUID(), authorId, "Looks good");
 
-        when(commentService.createComment(taskId, authorId, "Looks good")).thenReturn(comment);
+        when(commentService.createComment(tenantId, taskId, authorId, "Looks good")).thenReturn(comment);
 
         mockMvc.perform(post("/api/tasks/{taskId}/comments", taskId)
+                        .with(JwtTestSupport.withTenant(tenantId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"authorUserId":"%s","content":"Looks good"}
@@ -63,15 +73,17 @@ class CommentControllerTest {
                 .andExpect(jsonPath("$.content").value("Looks good"))
                 .andExpect(jsonPath("$.taskId").value(taskId.toString()));
 
-        verify(commentService).createComment(taskId, authorId, "Looks good");
+        verify(commentService).createComment(tenantId, taskId, authorId, "Looks good");
     }
 
     @Test
     void createComment_blankContent_returnsBadRequest() throws Exception {
+        UUID tenantId = UUID.randomUUID();
         UUID taskId = UUID.randomUUID();
         UUID authorId = UUID.randomUUID();
 
         mockMvc.perform(post("/api/tasks/{taskId}/comments", taskId)
+                        .with(JwtTestSupport.withTenant(tenantId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"authorUserId":"%s","content":""}
@@ -81,9 +93,11 @@ class CommentControllerTest {
 
     @Test
     void createComment_missingAuthor_returnsBadRequest() throws Exception {
+        UUID tenantId = UUID.randomUUID();
         UUID taskId = UUID.randomUUID();
 
         mockMvc.perform(post("/api/tasks/{taskId}/comments", taskId)
+                        .with(JwtTestSupport.withTenant(tenantId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"content":"Looks good"}
@@ -93,12 +107,14 @@ class CommentControllerTest {
 
     @Test
     void createComment_taskNotFound_returnsNotFound() throws Exception {
+        UUID tenantId = UUID.randomUUID();
         UUID taskId = UUID.randomUUID();
         UUID authorId = UUID.randomUUID();
-        when(commentService.createComment(eq(taskId), eq(authorId), any()))
+        when(commentService.createComment(eq(tenantId), eq(taskId), eq(authorId), any()))
                 .thenThrow(new ResourceNotFoundException("Task not found: " + taskId));
 
         mockMvc.perform(post("/api/tasks/{taskId}/comments", taskId)
+                        .with(JwtTestSupport.withTenant(tenantId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"authorUserId":"%s","content":"Ghost comment"}
@@ -108,43 +124,51 @@ class CommentControllerTest {
 
     @Test
     void listComments_returnsOk() throws Exception {
+        UUID tenantId = UUID.randomUUID();
         UUID taskId = UUID.randomUUID();
         Comment comment = commentFor(taskId, UUID.randomUUID(), UUID.randomUUID(), "Looks good");
-        when(commentService.listCommentsByTask(taskId)).thenReturn(List.of(comment));
+        when(commentService.listCommentsByTask(tenantId, taskId)).thenReturn(List.of(comment));
 
-        mockMvc.perform(get("/api/tasks/{taskId}/comments", taskId))
+        mockMvc.perform(get("/api/tasks/{taskId}/comments", taskId)
+                        .with(JwtTestSupport.withTenant(tenantId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].content").value("Looks good"));
     }
 
     @Test
     void getComment_found_returnsOk() throws Exception {
+        UUID tenantId = UUID.randomUUID();
         UUID taskId = UUID.randomUUID();
         UUID commentId = UUID.randomUUID();
         Comment comment = commentFor(taskId, commentId, UUID.randomUUID(), "Looks good");
-        when(commentService.getComment(commentId)).thenReturn(comment);
+        when(commentService.getComment(tenantId, commentId)).thenReturn(comment);
 
-        mockMvc.perform(get("/api/comments/{id}", commentId))
+        mockMvc.perform(get("/api/comments/{id}", commentId)
+                        .with(JwtTestSupport.withTenant(tenantId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(commentId.toString()));
     }
 
     @Test
     void getComment_notFound_returnsNotFound() throws Exception {
+        UUID tenantId = UUID.randomUUID();
         UUID commentId = UUID.randomUUID();
-        when(commentService.getComment(commentId)).thenThrow(new ResourceNotFoundException("Comment not found: " + commentId));
+        when(commentService.getComment(tenantId, commentId)).thenThrow(new ResourceNotFoundException("Comment not found: " + commentId));
 
-        mockMvc.perform(get("/api/comments/{id}", commentId))
+        mockMvc.perform(get("/api/comments/{id}", commentId)
+                        .with(JwtTestSupport.withTenant(tenantId)))
                 .andExpect(status().isNotFound());
     }
 
     @Test
     void deleteComment_returnsNoContent() throws Exception {
+        UUID tenantId = UUID.randomUUID();
         UUID commentId = UUID.randomUUID();
 
-        mockMvc.perform(delete("/api/comments/{id}", commentId))
+        mockMvc.perform(delete("/api/comments/{id}", commentId)
+                        .with(JwtTestSupport.withTenant(tenantId)))
                 .andExpect(status().isNoContent());
 
-        verify(commentService).deleteComment(commentId);
+        verify(commentService).deleteComment(tenantId, commentId);
     }
 }

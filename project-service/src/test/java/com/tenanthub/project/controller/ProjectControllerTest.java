@@ -2,12 +2,15 @@ package com.tenanthub.project.controller;
 
 import com.tenanthub.project.entity.Project;
 import com.tenanthub.project.exception.ResourceNotFoundException;
+import com.tenanthub.project.security.JwtTestSupport;
 import com.tenanthub.project.service.ProjectService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -26,9 +29,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Controller unit tests: MockMvc + a mocked ProjectService, no Spring context beyond
- * the web slice, no database. Security filters are disabled here so these tests stay
- * scoped to the controller/validation layer, independent of the JWT auth wired up in
- * security/SecurityConfig.
+ * the web slice, no database. Security filters are disabled (addFilters = false) so
+ * these tests stay scoped to the controller/validation layer - the jwt() request
+ * post-processor stands in for the real filter chain just enough to populate
+ * @AuthenticationPrincipal Jwt with a tenantId claim, since every endpoint reads the
+ * caller's tenant from there rather than the request body.
  */
 @WebMvcTest(ProjectController.class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -39,6 +44,11 @@ class ProjectControllerTest {
 
     @MockitoBean
     private ProjectService projectService;
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
 
     @Test
     void createProject_returnsCreated() throws Exception {
@@ -53,10 +63,11 @@ class ProjectControllerTest {
         when(projectService.createProject(tenantId, "Launch Website", "Q3 relaunch")).thenReturn(project);
 
         mockMvc.perform(post("/api/projects")
+                        .with(JwtTestSupport.withTenant(tenantId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"tenantId":"%s","name":"Launch Website","description":"Q3 relaunch"}
-                                """.formatted(tenantId)))
+                                {"name":"Launch Website","description":"Q3 relaunch"}
+                                """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(project.getId().toString()))
                 .andExpect(jsonPath("$.name").value("Launch Website"));
@@ -69,34 +80,27 @@ class ProjectControllerTest {
         UUID tenantId = UUID.randomUUID();
 
         mockMvc.perform(post("/api/projects")
+                        .with(JwtTestSupport.withTenant(tenantId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"tenantId":"%s","name":"","description":"desc"}
-                                """.formatted(tenantId)))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void createProject_missingTenantId_returnsBadRequest() throws Exception {
-        mockMvc.perform(post("/api/projects")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"name":"Launch Website"}
+                                {"name":"","description":"desc"}
                                 """))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     void listProjects_returnsOk() throws Exception {
+        UUID tenantId = UUID.randomUUID();
         Project project = Project.builder()
                 .id(UUID.randomUUID())
-                .tenantId(UUID.randomUUID())
+                .tenantId(tenantId)
                 .name("Launch Website")
                 .createdAt(LocalDateTime.now())
                 .build();
-        when(projectService.listProjects()).thenReturn(List.of(project));
+        when(projectService.listProjects(tenantId)).thenReturn(List.of(project));
 
-        mockMvc.perform(get("/api/projects"))
+        mockMvc.perform(get("/api/projects")
+                        .with(JwtTestSupport.withTenant(tenantId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(project.getId().toString()))
                 .andExpect(jsonPath("$[0].name").value("Launch Website"));
@@ -104,26 +108,30 @@ class ProjectControllerTest {
 
     @Test
     void getProject_found_returnsOk() throws Exception {
+        UUID tenantId = UUID.randomUUID();
         UUID id = UUID.randomUUID();
         Project project = Project.builder()
                 .id(id)
-                .tenantId(UUID.randomUUID())
+                .tenantId(tenantId)
                 .name("Launch Website")
                 .createdAt(LocalDateTime.now())
                 .build();
-        when(projectService.getProject(id)).thenReturn(project);
+        when(projectService.getProject(tenantId, id)).thenReturn(project);
 
-        mockMvc.perform(get("/api/projects/{id}", id))
+        mockMvc.perform(get("/api/projects/{id}", id)
+                        .with(JwtTestSupport.withTenant(tenantId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(id.toString()));
     }
 
     @Test
     void getProject_notFound_returnsNotFound() throws Exception {
+        UUID tenantId = UUID.randomUUID();
         UUID id = UUID.randomUUID();
-        when(projectService.getProject(id)).thenThrow(new ResourceNotFoundException("Project not found: " + id));
+        when(projectService.getProject(tenantId, id)).thenThrow(new ResourceNotFoundException("Project not found: " + id));
 
-        mockMvc.perform(get("/api/projects/{id}", id))
+        mockMvc.perform(get("/api/projects/{id}", id)
+                        .with(JwtTestSupport.withTenant(tenantId)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.message").value("Project not found: " + id))
@@ -132,17 +140,19 @@ class ProjectControllerTest {
 
     @Test
     void updateProject_returnsOk() throws Exception {
+        UUID tenantId = UUID.randomUUID();
         UUID id = UUID.randomUUID();
         Project updated = Project.builder()
                 .id(id)
-                .tenantId(UUID.randomUUID())
+                .tenantId(tenantId)
                 .name("New name")
                 .description("New desc")
                 .createdAt(LocalDateTime.now())
                 .build();
-        when(projectService.updateProject(id, "New name", "New desc")).thenReturn(updated);
+        when(projectService.updateProject(tenantId, id, "New name", "New desc")).thenReturn(updated);
 
         mockMvc.perform(put("/api/projects/{id}", id)
+                        .with(JwtTestSupport.withTenant(tenantId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"New name","description":"New desc"}
@@ -154,9 +164,11 @@ class ProjectControllerTest {
 
     @Test
     void updateProject_blankName_returnsBadRequest() throws Exception {
+        UUID tenantId = UUID.randomUUID();
         UUID id = UUID.randomUUID();
 
         mockMvc.perform(put("/api/projects/{id}", id)
+                        .with(JwtTestSupport.withTenant(tenantId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"","description":"desc"}
@@ -166,11 +178,13 @@ class ProjectControllerTest {
 
     @Test
     void deleteProject_returnsNoContent() throws Exception {
+        UUID tenantId = UUID.randomUUID();
         UUID id = UUID.randomUUID();
 
-        mockMvc.perform(delete("/api/projects/{id}", id))
+        mockMvc.perform(delete("/api/projects/{id}", id)
+                        .with(JwtTestSupport.withTenant(tenantId)))
                 .andExpect(status().isNoContent());
 
-        verify(projectService).deleteProject(id);
+        verify(projectService).deleteProject(tenantId, id);
     }
 }

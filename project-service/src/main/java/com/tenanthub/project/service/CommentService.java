@@ -20,8 +20,8 @@ public class CommentService {
     private final TaskService taskService;
 
     @Transactional
-    public Comment createComment(UUID taskId, UUID authorUserId, String content) {
-        Task task = taskService.getTask(taskId);
+    public Comment createComment(UUID tenantId, UUID taskId, UUID authorUserId, String content) {
+        Task task = taskService.getTask(tenantId, taskId);
         Comment comment = Comment.builder()
                 .task(task)
                 .authorUserId(authorUserId)
@@ -30,17 +30,18 @@ public class CommentService {
         return commentRepository.save(comment);
     }
 
-    public Comment getComment(UUID id) {
-        return commentRepository.findById(id)
+    public Comment getComment(UUID tenantId, UUID id) {
+        return commentRepository.findByIdAndTask_Project_TenantId(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found: " + id));
     }
 
-    public List<Comment> listCommentsByTask(UUID taskId) {
+    public List<Comment> listCommentsByTask(UUID tenantId, UUID taskId) {
+        taskService.getTask(tenantId, taskId);
         return commentRepository.findByTaskId(taskId);
     }
 
     @Transactional
-    public void deleteComment(UUID id) {
-        commentRepository.delete(getComment(id));
+    public void deleteComment(UUID tenantId, UUID id) {
+        commentRepository.delete(getComment(tenantId, id));
     }
 }
