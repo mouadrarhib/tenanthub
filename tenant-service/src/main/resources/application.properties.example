@@ -1,7 +1,7 @@
 spring.application.name=tenant-service
 server.port=8082
 
-spring.datasource.url=jdbc:postgresql://localhost:5432/tenanthub_tenant
+spring.datasource.url=jdbc:postgresql://localhost:5432/tenant_db
 spring.datasource.username=postgres
 spring.datasource.password=changeme
 spring.jpa.hibernate.ddl-auto=update
