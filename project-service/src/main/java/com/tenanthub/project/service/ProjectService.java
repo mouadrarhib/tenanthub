@@ -1,12 +1,15 @@
 package com.tenanthub.project.service;
 
+import com.tenanthub.events.ProjectCreatedEvent;
 import com.tenanthub.project.entity.Project;
+import com.tenanthub.project.event.ProjectEventPublisher;
 import com.tenanthub.project.exception.ResourceNotFoundException;
 import com.tenanthub.project.repository.ProjectRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -16,6 +19,7 @@ import java.util.UUID;
 public class ProjectService {
 
     private final ProjectRepository projectRepository;
+    private final ProjectEventPublisher eventPublisher;
 
     @Transactional
     public Project createProject(UUID tenantId, String name, String description) {
@@ -24,7 +28,11 @@ public class ProjectService {
                 .name(name)
                 .description(description)
                 .build();
-        return projectRepository.save(project);
+        Project saved = projectRepository.save(project);
+
+        eventPublisher.publishProjectCreated(new ProjectCreatedEvent(
+                saved.getId(), tenantId, saved.getName(), Instant.now()));
+        return saved;
     }
 
     // Not found and "belongs to another tenant" return the same 404 - confirming a
