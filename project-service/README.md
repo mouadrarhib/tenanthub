@@ -119,6 +119,19 @@ Deliberately no blanket `Exception` handler — that would also swallow exceptio
 Spring MVC already handles well (malformed JSON, a non-UUID path variable), turning
 their normal `400` into a generic `500`.
 
+## Events published
+
+This service publishes to Kafka after each save completes (fire-and-forget — it
+doesn't wait for or care who's listening). Full event shapes, the DLT/retry story,
+and the end-to-end flow live in `shared-events/README.md`; this is just what
+originates here:
+
+| Topic | When | Consumed by |
+|---|---|---|
+| `project.created` | a project is created | `billing-service` (usage tracking) |
+| `task.created` | a task is created | *(no consumer yet)* |
+| `task.assigned` | a task is created **with** an assignee, or an existing task's assignee changes | `notification-service` (email) |
+
 ## API docs
 
 Swagger UI: `http://localhost:8083/swagger-ui/index.html` · OpenAPI JSON:
@@ -160,7 +173,7 @@ that's still open.
 |---|---|
 | `spring.datasource.*` | Postgres connection for `tenanthub_project` |
 | `jwt.secret` | Shared HMAC-SHA256 key — must match `auth-service` exactly |
-| `spring.kafka.bootstrap-servers` | Present on the classpath, unused until P4 |
+| `spring.kafka.bootstrap-servers` | Kafka connection — see "Events published" above |
 | `eureka.client.service-url.defaultZone` | Present on the classpath, unused until P5 |
 
 Real values live in the gitignored `application.properties`; `application.properties.example`

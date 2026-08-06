@@ -49,6 +49,20 @@ Both error shapes (and validation errors) go through `GlobalExceptionHandler`, w
 returns a consistent `ErrorResponse` body: `timestamp`, `status`, `error`, `message`,
 `path`.
 
+### `GET /internal/users/{id}` — server-to-server only
+
+```
+curl http://localhost:8081/internal/users/{id}
+```
+
+→ `{"id": "...", "email": "..."}`, or `404` if unknown. Added for
+`notification-service` to resolve a Kafka event's `assigneeUserId` into an email
+address (see `shared-events/README.md`). Deliberately **not** part of the public
+API above — no JWT check, since there's no human in this call, just one service
+asking another. Permitted through `SecurityConfig` alongside `/api/auth/**`. There's
+no service-to-service auth yet (API key, mTLS, etc.) — anyone who can reach this
+port can call it. That's a known gap, to be closed once the Gateway (P5) exists.
+
 ## Data model
 
 ```
