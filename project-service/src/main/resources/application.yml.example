@@ -20,6 +20,8 @@ eureka:
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
 
 # auth-service signs JWTs with jjwt + HS256 using this shared secret (not a real
 # OIDC/OAuth2 issuer, so no issuer-uri/JWK discovery here) - must match auth-service's
