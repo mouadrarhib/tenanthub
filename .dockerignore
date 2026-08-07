@@ -1,0 +1,19 @@
+# Build output (rebuilt fresh inside the image)
+**/target/
+
+# VCS / IDE
+.git/
+.idea/
+.vscode/
+*.iml
+
+# Local-only docs, never needed inside an image
+New folder/
+ROADMAP.md
+README.md
+*.md
+!HELP.md
+
+# OS
+.DS_Store
+Thumbs.db
