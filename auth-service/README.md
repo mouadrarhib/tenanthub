@@ -216,10 +216,10 @@ sequenceDiagram
 
 | Property | Meaning |
 |---|---|
-| `jwt.secret` | Shared HMAC-SHA256 signing key. **Must be identical** in auth-service and project-service (and any future service that needs to verify these tokens) — see `application.properties.example` in both. |
+| `jwt.secret` | Shared HMAC-SHA256 signing key. **Must be identical** in auth-service and project-service (and any future service that needs to verify these tokens) — see `application.yml.example` in both. |
 | `jwt.expiration-ms` | Token lifetime in milliseconds (default `3600000` = 1 hour). Only read by auth-service (it sets `exp`); project-service just checks the resulting `exp` claim, it doesn't need this value itself. |
 
-Real values live in the gitignored `application.properties`; `application.properties.example`
+Real values live in the gitignored `application.yml`; `application.yml.example`
 only ever holds placeholders.
 
 ## Known limitations (by design, for now)

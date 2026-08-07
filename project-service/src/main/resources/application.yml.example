@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: project-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/tenanthub_project
+    username: postgres
+    password: changeme
+  flyway:
+    enabled: true
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+server:
+  port: 8083
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+# auth-service signs JWTs with jjwt + HS256 using this shared secret (not a real
+# OIDC/OAuth2 issuer, so no issuer-uri/JWK discovery here) - must match auth-service's
+# jwt.secret exactly. security/SecurityConfig builds a JwtDecoder from it.
+jwt:
+  secret: changeme-replace-with-a-strong-secret-key

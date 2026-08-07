@@ -48,5 +48,5 @@ need `project-service` to call this service *before* saving, which doesn't exist
 | `spring.kafka.bootstrap-servers` / `consumer.*` | Kafka connection + consumer group (`billing-service`) |
 | `eureka.client.service-url.defaultZone` | Present on the classpath, unused until P5 |
 
-Real values live in the gitignored `application.properties`; `application.properties.example`
+Real values live in the gitignored `application.yml`; `application.yml.example`
 only ever holds placeholders.

@@ -142,7 +142,7 @@ actually calling an endpoint through "Try it out" still needs a bearer token.
 
 1. Postgres running locally, database `tenanthub_project` created (Flyway applies
    `db/migration/V1__init.sql` automatically on startup — no manual schema step).
-2. `application.properties` (gitignored, copy from `application.properties.example`)
+2. `application.yml` (gitignored, copy from `application.yml.example`)
    needs `jwt.secret` set to the **exact same value** as `auth-service`'s.
 3. Start `auth-service` first (port `8081`) so you have somewhere to get a token from.
 4. `./mvnw spring-boot:run`
@@ -176,7 +176,7 @@ that's still open.
 | `spring.kafka.bootstrap-servers` | Kafka connection — see "Events published" above |
 | `eureka.client.service-url.defaultZone` | Present on the classpath, unused until P5 |
 
-Real values live in the gitignored `application.properties`; `application.properties.example`
+Real values live in the gitignored `application.yml`; `application.yml.example`
 only ever holds placeholders.
 
 ## Known limitations (by design, for now)

@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: notification-service
+  mail:
+    host: smtp.example.com
+    port: 587
+    username: changeme@example.com
+    password: changeme
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: notification-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.trusted.packages: com.tenanthub.events
+    producer:
+      # Needed so KafkaErrorHandlingConfig's DeadLetterPublishingRecoverer can
+      # serialize a failed event onto its "<topic>.DLT" topic.
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+server:
+  port: 8084
+
+# auth-service exposes GET /internal/users/{id} for server-to-server email lookups -
+# direct URL for now, no Gateway/Eureka-based discovery until P5.
+auth-service:
+  base-url: http://localhost:8081
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/

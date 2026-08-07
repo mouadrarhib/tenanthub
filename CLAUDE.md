@@ -48,12 +48,11 @@ Hard rules:
 
 ## Secrets and config
 
-- Real `application.properties` / `application.yml` / `.env` files are gitignored and
-  must never be committed — they hold local DB/mail/JWT credentials.
-- Every service's committed config lives in `application.properties.example`
-  (placeholder values only). When a service needs a new config key, add it to the
-  `.example` file first, then mirror it into the local (gitignored)
-  `application.properties`.
+- Real `application.yml` / `.env` files are gitignored and must never be committed —
+  they hold local DB/mail/JWT credentials.
+- Every service's committed config lives in `application.yml.example` (placeholder
+  values only). When a service needs a new config key, add it to the `.example` file
+  first, then mirror it into the local (gitignored) `application.yml`.
 
 ## Scope discipline
 

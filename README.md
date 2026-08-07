@@ -217,10 +217,10 @@ configured with their intended dependencies — no business logic yet.
 git clone <this-repo-url>
 cd tenanthub
 
-# Each service ships a safe-to-commit application.properties.example.
-# Copy it to a real (gitignored) application.properties before running a service:
-cp auth-service/src/main/resources/application.properties.example \
-   auth-service/src/main/resources/application.properties
+# Each service ships a safe-to-commit application.yml.example.
+# Copy it to a real (gitignored) application.yml before running a service:
+cp auth-service/src/main/resources/application.yml.example \
+   auth-service/src/main/resources/application.yml
 
 # Build the whole reactor
 mvn clean install

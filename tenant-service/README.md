@@ -42,5 +42,5 @@ tenant is allowed to have.
 | `spring.kafka.bootstrap-servers` | Kafka connection — see "Events published" above |
 | `eureka.client.service-url.defaultZone` | Present on the classpath, unused until P5 |
 
-Real values live in the gitignored `application.properties`; `application.properties.example`
+Real values live in the gitignored `application.yml`; `application.yml.example`
 only ever holds placeholders.
