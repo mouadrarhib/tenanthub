@@ -14,18 +14,46 @@ spring:
               uri: lb://auth-service
               predicates:
                 - Path=/api/auth/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 10
+                    redis-rate-limiter.burstCapacity: 20
+                    redis-rate-limiter.requestedTokens: 1
+                    key-resolver: "#{@ipKeyResolver}"
             - id: tenant-route
               uri: lb://tenant-service
               predicates:
                 - Path=/api/tenants/**,/api/plans/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 10
+                    redis-rate-limiter.burstCapacity: 20
+                    redis-rate-limiter.requestedTokens: 1
+                    key-resolver: "#{@ipKeyResolver}"
             - id: project-route
               uri: lb://project-service
               predicates:
                 - Path=/api/projects/**,/api/tasks/**,/api/comments/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 10
+                    redis-rate-limiter.burstCapacity: 20
+                    redis-rate-limiter.requestedTokens: 1
+                    key-resolver: "#{@ipKeyResolver}"
             - id: billing-route
               uri: lb://billing-service
               predicates:
                 - Path=/api/billing/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 10
+                    redis-rate-limiter.burstCapacity: 20
+                    redis-rate-limiter.requestedTokens: 1
+                    key-resolver: "#{@ipKeyResolver}"
 
 server:
   port: 8080
