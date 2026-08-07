@@ -1,0 +1,12 @@
+# Non-sensitive config shared by every app service. Change a value here and
+# restart the affected Pods (kubectl rollout restart) - no image rebuild.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tenanthub-config
+  namespace: tenanthub
+data:
+  EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+  SPRING_DATA_REDIS_HOST: "redis"
+  AUTH_SERVICE_BASE_URL: "http://auth-service:8081"

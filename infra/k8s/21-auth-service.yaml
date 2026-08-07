@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: tenanthub
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      containers:
+        - name: auth-service
+          image: tenanthub/auth-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8081
+          envFrom:
+            - configMapRef: { name: tenanthub-config }
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://auth-db:5432/auth_db"
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: tenanthub-secrets, key: POSTGRES_PASSWORD }
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef: { name: tenanthub-secrets, key: JWT_SECRET }
+          resources:
+            requests: { memory: "256Mi", cpu: "250m" }
+            limits: { memory: "512Mi", cpu: "500m" }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8081 }
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8081 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: tenanthub
+spec:
+  selector:
+    app: auth-service
+  ports:
+    - port: 8081
+      targetPort: 8081

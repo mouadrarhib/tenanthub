@@ -1,0 +1,60 @@
+# Images referenced below (tenanthub/<service>:latest) are built locally via
+# each service's Dockerfile (docker build -f <service>/Dockerfile -t
+# tenanthub/<service>:latest .  from the repo root) and are not pushed to a
+# registry - for a local cluster, load them in first:
+#   kind load docker-image tenanthub/discovery-service:latest --name <cluster>
+#   # or: minikube image load tenanthub/discovery-service:latest
+#
+# Single replica - Eureka here is a demo-scale service registry, not a
+# highly-available cluster (application.yml already sets
+# register-with-eureka/fetch-registry: false, i.e. it doesn't peer with
+# other Eureka instances, so running >1 replica wouldn't share state anyway).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: discovery-service
+  namespace: tenanthub
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: discovery-service
+  template:
+    metadata:
+      labels:
+        app: discovery-service
+    spec:
+      containers:
+        - name: discovery-service
+          image: tenanthub/discovery-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8761
+          resources:
+            requests: { memory: "256Mi", cpu: "250m" }
+            limits: { memory: "512Mi", cpu: "500m" }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8761 }
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8761 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: discovery-service
+  namespace: tenanthub
+spec:
+  selector:
+    app: discovery-service
+  ports:
+    - port: 8761
+      targetPort: 8761
