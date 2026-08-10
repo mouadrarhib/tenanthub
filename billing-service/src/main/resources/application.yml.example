@@ -24,6 +24,12 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
+# auth-service signs JWTs with jjwt + HS256 using this shared secret (not a real
+# OIDC/OAuth2 issuer, so no issuer-uri/JWK discovery here) - must match auth-service's
+# jwt.secret exactly. security/SecurityConfig builds a JwtDecoder from it.
+jwt:
+  secret: changeme-replace-with-a-strong-secret-key
+
 server:
   port: 8085
 
