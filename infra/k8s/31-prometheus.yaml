@@ -1,7 +1,42 @@
-# Scrapes every app service's /actuator/prometheus over the in-cluster Service
-# DNS name (unqualified - Prometheus runs in the same "tenanthub" namespace).
+# Scrapes every app service's /actuator/prometheus by discovering individual
+# Pods through the Kubernetes API (role: pod), not by hitting each service's
+# ClusterIP. Services like auth-service/gateway-service run 2 replicas behind
+# one load-balanced VIP - scraping the VIP makes kube-proxy hand each 15s
+# scrape to a different, independent replica, so the "same" counter jumps
+# between two unrelated cumulative totals and rate() reads as noise/resets.
+# Discovering Pods directly gives Prometheus one stable target per replica.
 # No PVC - metrics history resets on Pod restart, fine for a demo cluster; a
 # real deployment would use a PVC or a managed Prometheus (Grafana Cloud, AMP).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: tenanthub
+---
+# Cluster-scoped because pod discovery watches the API server, not just this
+# namespace's objects - kept read-only (get/list/watch), no write verbs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: tenanthub
+roleRef:
+  kind: ClusterRole
+  name: prometheus
+  apiGroup: rbac.authorization.k8s.io
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -13,40 +48,31 @@ data:
       scrape_interval: 15s
 
     scrape_configs:
-      - job_name: 'discovery-service'
-        metrics_path: '/actuator/prometheus'
-        static_configs:
-          - targets: ['discovery-service:8761']
-
-      - job_name: 'auth-service'
-        metrics_path: '/actuator/prometheus'
-        static_configs:
-          - targets: ['auth-service:8081']
-
-      - job_name: 'tenant-service'
-        metrics_path: '/actuator/prometheus'
-        static_configs:
-          - targets: ['tenant-service:8082']
-
-      - job_name: 'project-service'
-        metrics_path: '/actuator/prometheus'
-        static_configs:
-          - targets: ['project-service:8083']
-
-      - job_name: 'notification-service'
-        metrics_path: '/actuator/prometheus'
-        static_configs:
-          - targets: ['notification-service:8084']
-
-      - job_name: 'billing-service'
-        metrics_path: '/actuator/prometheus'
-        static_configs:
-          - targets: ['billing-service:8085']
-
-      - job_name: 'gateway-service'
-        metrics_path: '/actuator/prometheus'
-        static_configs:
-          - targets: ['gateway-service:8080']
+      - job_name: 'tenanthub-services'
+        metrics_path: /actuator/prometheus
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: ['tenanthub']
+        relabel_configs:
+          # only our 7 app services carry this label with one of these
+          # values (Postgres/Redis/Kafka/Prometheus/Grafana pods don't match,
+          # so they're never scraped for Spring's /actuator/prometheus)
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            regex: 'discovery-service|auth-service|tenant-service|project-service|notification-service|billing-service|gateway-service'
+            action: keep
+          # only scrape once the Pod is actually ready, not while it's still
+          # inside its startupProbe window
+          - source_labels: [__meta_kubernetes_pod_ready]
+            regex: 'true'
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_ip, __meta_kubernetes_pod_container_port_number]
+            separator: ':'
+            target_label: __address__
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            target_label: job
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -63,6 +89,7 @@ spec:
       labels:
         app: prometheus
     spec:
+      serviceAccountName: prometheus
       containers:
         - name: prometheus
           image: prom/prometheus:latest
@@ -83,7 +110,7 @@ spec:
             periodSeconds: 10
           resources:
             requests: { memory: "256Mi", cpu: "100m" }
-            limits: { memory: "512Mi", cpu: "500m" }
+            limits: { memory: "512Mi", cpu: "400m" }
       volumes:
         - name: config
           configMap:
