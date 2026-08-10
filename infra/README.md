@@ -239,6 +239,19 @@ Deployment's Pods, which come and go as they restart, scale, or roll out updates
   so the liveness probe was killing Pods mid-boot. Fixed with a `startupProbe` on every
   service (see each Deployment's manifest) that holds off readiness/liveness checks
   entirely until the app has started once.
+- **Resource limits (P7 follow-up):** with Prometheus and Grafana added on top of the full
+  stack, running everything on one Docker Desktop node (8 vCPU) exposed a real overcommit -
+  summed CPU *limits* across all Pods reached 138% of the node's allocatable CPU (requests
+  were fine at 66%). Under real load (a sustained synthetic traffic test), that let CPU
+  cgroup-throttle enough Pods at once to fail Postgres/Redis/Prometheus/Grafana health
+  checks simultaneously and trigger a cascade of restarts - not an app bug, a capacity
+  planning gap. Trimmed CPU limits across the Postgres Deployments, Redis, Kafka,
+  discovery-service, the 6 two-replica app services, and Prometheus (roughly a 30%
+  cut each) to bring total CPU limits back to ~100% of node capacity. Deliberately left
+  memory limits and Grafana's CPU limit untouched: no OOMKilled events occurred (this was
+  a CPU story, not memory), the JVM services already run close to their heap ceiling via
+  `-XX:MaxRAMPercentage=75.0`, and Grafana's CPU limit was raised earlier specifically to
+  survive its slow first-boot - undoing that would reintroduce the exact problem it fixed.
 
 ## Folder Structure
 

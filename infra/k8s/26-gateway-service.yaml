@@ -30,7 +30,7 @@ spec:
           envFrom:
             - configMapRef: { name: tenanthub-config }
           resources:
-            requests: { memory: "256Mi", cpu: "250m" }
+            requests: { memory: "256Mi", cpu: "200m" }
             limits: { memory: "512Mi", cpu: "500m" }
           # Gates readiness/liveness until the app has started once - see
           # 20-discovery-service.yaml for why this is needed (CPU-limited JVM
