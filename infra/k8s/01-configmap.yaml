@@ -10,3 +10,6 @@ data:
   SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
   SPRING_DATA_REDIS_HOST: "redis"
   AUTH_SERVICE_BASE_URL: "http://auth-service:8081"
+  # Dev-only fake SMTP - see 34-mailpit.yaml. No auth needed on the SMTP side.
+  SPRING_MAIL_HOST: "mailpit"
+  SPRING_MAIL_PORT: "1025"

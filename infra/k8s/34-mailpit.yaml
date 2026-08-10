@@ -1,0 +1,52 @@
+# Dev-only fake SMTP server + web UI, same image and purpose as
+# infra/docker-compose.yml's mailpit service - catches every email
+# notification-service sends instead of delivering it anywhere. No auth on
+# the SMTP side (see SPRING_MAIL_HOST/PORT in 01-configmap.yaml). No Ingress
+# route, reach the web UI with:
+#   kubectl -n tenanthub port-forward svc/mailpit 8025:8025
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mailpit
+  namespace: tenanthub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mailpit
+  template:
+    metadata:
+      labels:
+        app: mailpit
+    spec:
+      containers:
+        - name: mailpit
+          image: axllent/mailpit:latest
+          ports:
+            - containerPort: 1025
+            - containerPort: 8025
+          resources:
+            requests: { memory: "64Mi", cpu: "50m" }
+            limits: { memory: "128Mi", cpu: "200m" }
+          readinessProbe:
+            httpGet: { path: /readyz, port: 8025 }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /readyz, port: 8025 }
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mailpit
+  namespace: tenanthub
+spec:
+  selector:
+    app: mailpit
+  ports:
+    - name: smtp
+      port: 1025
+      targetPort: 1025
+    - name: http
+      port: 8025
+      targetPort: 8025
