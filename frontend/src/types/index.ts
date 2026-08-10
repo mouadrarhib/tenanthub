@@ -37,6 +37,10 @@ export interface TaskRequest {
   dueDate: string | null;
 }
 
+export interface MeResponse {
+  userId: string;
+}
+
 export interface UsageSummary {
   tenantId: string;
   planName: string;

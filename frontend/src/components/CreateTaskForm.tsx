@@ -1,13 +1,28 @@
 import { useState, type FormEvent } from 'react';
 import { createTask } from '../api/tasks';
+import { getMe } from '../api/me';
 import type { Task, TaskStatus } from '../types';
 
 export function CreateTaskForm({ projectId, onCreated }: { projectId: string; onCreated: (task: Task) => void }) {
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState<TaskStatus>('TODO');
   const [dueDate, setDueDate] = useState('');
+  const [assigneeUserId, setAssigneeUserId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFetchingMe, setIsFetchingMe] = useState(false);
+
+  const handleAssignToMe = async () => {
+    setIsFetchingMe(true);
+    try {
+      const { userId } = await getMe();
+      setAssigneeUserId(userId);
+    } catch {
+      setError('Failed to look up your user id');
+    } finally {
+      setIsFetchingMe(false);
+    }
+  };
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -17,13 +32,14 @@ export function CreateTaskForm({ projectId, onCreated }: { projectId: string; on
       const task = await createTask(projectId, {
         title,
         status,
-        assigneeUserId: null,
+        assigneeUserId: assigneeUserId.trim() || null,
         dueDate: dueDate || null,
       });
       onCreated(task);
       setTitle('');
       setDueDate('');
       setStatus('TODO');
+      setAssigneeUserId('');
     } catch {
       setError('Failed to create task');
     } finally {
@@ -73,6 +89,29 @@ export function CreateTaskForm({ projectId, onCreated }: { projectId: string; on
           onChange={(e) => setDueDate(e.target.value)}
           className="mt-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
         />
+      </div>
+
+      <div className="min-w-[220px] flex-1">
+        <label htmlFor="assigneeUserId" className="block text-xs font-medium text-slate-500">
+          Assignee user ID (optional)
+        </label>
+        <div className="mt-1 flex gap-2">
+          <input
+            id="assigneeUserId"
+            value={assigneeUserId}
+            onChange={(e) => setAssigneeUserId(e.target.value)}
+            placeholder="paste a user's id to notify them by email"
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+          />
+          <button
+            type="button"
+            onClick={handleAssignToMe}
+            disabled={isFetchingMe}
+            className="whitespace-nowrap rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isFetchingMe ? 'Loading…' : 'Assign to me'}
+          </button>
+        </div>
       </div>
 
       <button
