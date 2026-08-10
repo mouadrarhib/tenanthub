@@ -1,0 +1,172 @@
+# Grafana, provisioned declaratively (no manual "add data source" / "import
+# dashboard" clicking): a datasource pointing at the in-cluster Prometheus
+# Service, a dashboard provider that watches /var/lib/grafana/dashboards, and
+# the actual dashboard JSON - all three as ConfigMaps mounted into the Pod.
+# No PVC - same reasoning as prometheus, this is a demo cluster.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: tenanthub
+data:
+  datasource.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        uid: prometheus
+        url: http://prometheus:9090
+        isDefault: true
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-provider
+  namespace: tenanthub
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: tenanthub
+        orgId: 1
+        folder: ''
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 30
+        options:
+          path: /var/lib/grafana/dashboards
+---
+# request rate and error rate grouped by Prometheus's `job` label (set per
+# scrape target in 31-prometheus.yaml) - no Micrometer "application" tag
+# needed on the app side, the label Prometheus already attaches is enough.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-tenanthub
+  namespace: tenanthub
+data:
+  tenanthub-overview.json: |
+    {
+      "title": "TenantHub — Overview",
+      "uid": "tenanthub-overview",
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "10s",
+      "time": { "from": "now-15m", "to": "now" },
+      "panels": [
+        {
+          "id": 1,
+          "title": "Request Rate (req/s by service)",
+          "type": "timeseries",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "targets": [
+            {
+              "expr": "sum by (job) (rate(http_server_requests_seconds_count[1m]))",
+              "legendFormat": "{{job}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "Error Rate (5xx req/s by service)",
+          "type": "timeseries",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "targets": [
+            {
+              "expr": "sum by (job) (rate(http_server_requests_seconds_count{status=~\"5..\"}[1m]))",
+              "legendFormat": "{{job}}",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: tenanthub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:latest
+          ports:
+            - containerPort: 3000
+          # Demo-cluster default credentials (admin/admin, Grafana forces a
+          # change prompt on first login) - not worth a Secret entry for a
+          # local/demo dashboard; real deployments would set
+          # GF_SECURITY_ADMIN_PASSWORD from a Secret instead.
+          env:
+            # Grafana's default background installer tries to fetch a set of
+            # plugins from grafana.com on every startup; this cluster has no
+            # route out to the internet, so those calls hang until timeout and
+            # a shutdown mid-fetch was hitting a real nil-pointer panic in
+            # Grafana's provisioning code (unrelated to our config) - disabled
+            # since we don't use any of those plugins.
+            - name: GF_PLUGINS_PREINSTALL_DISABLED
+              value: "true"
+          volumeMounts:
+            - name: datasources
+              mountPath: /etc/grafana/provisioning/datasources
+            - name: dashboard-provider
+              mountPath: /etc/grafana/provisioning/dashboards
+            - name: dashboard-tenanthub
+              mountPath: /var/lib/grafana/dashboards
+          # Gates readiness/liveness until Grafana finishes booting - this
+          # version's startup (its own embedded apiserver/app-platform,
+          # alerting engine, provisioning controllers, SQLite migrations) is
+          # noticeably heavier than a typical Grafana image and regularly took
+          # 3+ minutes under this cluster's CPU limits (same startupProbe
+          # pattern as every service in infra/k8s, see 20-discovery-service.yaml
+          # for the original writeup of why a fixed initialDelaySeconds fails
+          # here).
+          startupProbe:
+            httpGet: { path: /api/health, port: 3000 }
+            failureThreshold: 60
+            periodSeconds: 5
+          readinessProbe:
+            httpGet: { path: /api/health, port: 3000 }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /api/health, port: 3000 }
+            periodSeconds: 10
+          resources:
+            requests: { memory: "256Mi", cpu: "250m" }
+            limits: { memory: "512Mi", cpu: "750m" }
+      volumes:
+        - name: datasources
+          configMap:
+            name: grafana-datasources
+        - name: dashboard-provider
+          configMap:
+            name: grafana-dashboard-provider
+        - name: dashboard-tenanthub
+          configMap:
+            name: grafana-dashboard-tenanthub
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: tenanthub
+spec:
+  selector:
+    app: grafana
+  ports:
+    - port: 3000
+      targetPort: 3000

@@ -179,6 +179,8 @@ flowchart TD
 | `20-discovery-service.yaml` | Eureka, `replicas: 1` (it doesn't peer-register, so more replicas wouldn't add availability) |
 | `21`–`26-*.yaml` | The 6 remaining app services — `replicas: 2`, readiness/liveness probes, resource limits, rolling updates |
 | `30-ingress.yaml` | The external entry point, routing to `gateway-service` |
+| `31-prometheus.yaml` | `prometheus-config` ConfigMap (scrape config for all 7 services' `/actuator/prometheus`) + Prometheus Deployment + Service |
+| `32-grafana.yaml` | Grafana Deployment + Service, provisioned via ConfigMaps (Prometheus datasource + a "TenantHub — Overview" dashboard: request rate + error rate panels by service) |
 
 **Applying it** (requires a cluster — kind, minikube, or similar — plus an Ingress
 controller such as `ingress-nginx` for the last file to do anything):
@@ -263,5 +265,7 @@ infra/
     ├── 24-notification-service.yaml
     ├── 25-billing-service.yaml
     ├── 26-gateway-service.yaml
-    └── 30-ingress.yaml
+    ├── 30-ingress.yaml
+    ├── 31-prometheus.yaml
+    └── 32-grafana.yaml
 ```

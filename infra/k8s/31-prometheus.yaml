@@ -1,0 +1,102 @@
+# Scrapes every app service's /actuator/prometheus over the in-cluster Service
+# DNS name (unqualified - Prometheus runs in the same "tenanthub" namespace).
+# No PVC - metrics history resets on Pod restart, fine for a demo cluster; a
+# real deployment would use a PVC or a managed Prometheus (Grafana Cloud, AMP).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: tenanthub
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+
+    scrape_configs:
+      - job_name: 'discovery-service'
+        metrics_path: '/actuator/prometheus'
+        static_configs:
+          - targets: ['discovery-service:8761']
+
+      - job_name: 'auth-service'
+        metrics_path: '/actuator/prometheus'
+        static_configs:
+          - targets: ['auth-service:8081']
+
+      - job_name: 'tenant-service'
+        metrics_path: '/actuator/prometheus'
+        static_configs:
+          - targets: ['tenant-service:8082']
+
+      - job_name: 'project-service'
+        metrics_path: '/actuator/prometheus'
+        static_configs:
+          - targets: ['project-service:8083']
+
+      - job_name: 'notification-service'
+        metrics_path: '/actuator/prometheus'
+        static_configs:
+          - targets: ['notification-service:8084']
+
+      - job_name: 'billing-service'
+        metrics_path: '/actuator/prometheus'
+        static_configs:
+          - targets: ['billing-service:8085']
+
+      - job_name: 'gateway-service'
+        metrics_path: '/actuator/prometheus'
+        static_configs:
+          - targets: ['gateway-service:8080']
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: tenanthub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+        - name: prometheus
+          image: prom/prometheus:latest
+          args:
+            - '--config.file=/etc/prometheus/prometheus.yml'
+          ports:
+            - containerPort: 9090
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+          readinessProbe:
+            httpGet: { path: /-/ready, port: 9090 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /-/healthy, port: 9090 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests: { memory: "256Mi", cpu: "100m" }
+            limits: { memory: "512Mi", cpu: "500m" }
+      volumes:
+        - name: config
+          configMap:
+            name: prometheus-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: tenanthub
+spec:
+  selector:
+    app: prometheus
+  ports:
+    - port: 9090
+      targetPort: 9090
