@@ -20,9 +20,14 @@ public final class JwtTestSupport {
     }
 
     public static RequestPostProcessor withTenant(UUID tenantId) {
+        return withTenant(tenantId, UUID.randomUUID());
+    }
+
+    public static RequestPostProcessor withTenant(UUID tenantId, UUID userId) {
         return request -> {
             Jwt jwt = Jwt.withTokenValue("test-token")
                     .header("alg", "none")
+                    .subject(userId.toString())
                     .claim("tenantId", tenantId.toString())
                     .issuedAt(Instant.now())
                     .expiresAt(Instant.now().plusSeconds(3600))

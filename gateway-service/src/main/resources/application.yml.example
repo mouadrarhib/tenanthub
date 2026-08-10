@@ -45,7 +45,7 @@ spring:
             - id: project-route
               uri: lb://project-service
               predicates:
-                - Path=/api/projects/**,/api/tasks/**,/api/comments/**
+                - Path=/api/projects/**,/api/tasks/**,/api/comments/**,/api/me
               filters:
                 - name: RequestRateLimiter
                   args:
