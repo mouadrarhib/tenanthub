@@ -226,9 +226,17 @@ Deployment's Pods, which come and go as they restart, scale, or roll out updates
 - **Docker images & docker-compose:** built and run end to end. All 13 containers come up
   healthy, all 6 app services register in Eureka, and requests through the Gateway
   correctly reach auth/tenant/project services with tenant/JWT security intact.
-- **Kubernetes manifests:** written and YAML-valid, mirroring the exact same hostnames,
-  images, and environment variables the compose stack already proved work — but not yet
-  applied to a live cluster (no kind/minikube set up on the machine this was built on).
+- **Kubernetes manifests:** deployed and verified live on Docker Desktop's Kubernetes
+  (single-node, kind-based). All 4 databases, Redis, Kafka, discovery-service, and all 6
+  app services came up `Running`/`Ready`; a request through a real Ingress (via
+  `ingress-nginx`) correctly reached tenant-service, project-service (401, JWT security
+  intact), and auth-service (400, validation reached). One real bug found running this
+  for real: the original readiness/liveness probes used a fixed `initialDelaySeconds`,
+  but under the CPU limits set below, JVM startup - especially with several services
+  starting at once and competing for the same CPU - regularly took well past that delay,
+  so the liveness probe was killing Pods mid-boot. Fixed with a `startupProbe` on every
+  service (see each Deployment's manifest) that holds off readiness/liveness checks
+  entirely until the app has started once.
 
 ## Folder Structure
 
