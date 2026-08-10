@@ -9,6 +9,16 @@ spring:
     gateway:
       server:
         webflux:
+          # Only the frontend's dev-server origin needs to be allowed here - it's the
+          # one place a browser calls in from, since every downstream service is only
+          # ever reached via lb://, never directly. No allow-credentials: the JWT rides
+          # as an Authorization header from localStorage, not a cookie.
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowedOrigins: "http://localhost:5173"
+                allowedMethods: [GET, POST, PUT, DELETE, OPTIONS]
+                allowedHeaders: [Authorization, Content-Type]
           routes:
             - id: auth-route
               uri: lb://auth-service
