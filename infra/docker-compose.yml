@@ -16,6 +16,10 @@ services:
   # Infrastructure
   # ---------------------------------------------------------------------
 
+  # Host ports below start at 5433, not 5432 - a local Postgres install
+  # already owns 5432 on this machine. Published purely so a DB client
+  # (DBeaver etc.) on the host can connect directly; app services still
+  # talk to these over the compose network on the standard 5432.
   auth-db:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -23,6 +27,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: auth_db
+    ports:
+      - "5433:5432"
     volumes:
       - auth-db-data:/var/lib/postgresql/data
     healthcheck:
@@ -38,6 +44,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: tenant_db
+    ports:
+      - "5434:5432"
     volumes:
       - tenant-db-data:/var/lib/postgresql/data
     healthcheck:
@@ -53,6 +61,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: tenanthub_project
+    ports:
+      - "5435:5432"
     volumes:
       - project-db-data:/var/lib/postgresql/data
     healthcheck:
@@ -68,6 +78,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: tenanthub_billing
+    ports:
+      - "5436:5432"
     volumes:
       - billing-db-data:/var/lib/postgresql/data
     healthcheck:
@@ -103,6 +115,75 @@ services:
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  # Dev-only browser UI for inspecting Kafka topics/messages. Not part of
+  # the application - safe to remove, exists purely for local debugging.
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    restart: unless-stopped
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: tenanthub
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      kafka:
+        condition: service_started
+
+  # Dev-only fake SMTP server + web UI - catches every email notification-service
+  # sends instead of delivering it anywhere. No auth needed on the SMTP side, so
+  # notification-service's mail username/password are simply left unset locally.
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8025/readyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Scrapes every app service's /actuator/prometheus by static Compose
+  # hostname:port - see infra/prometheus.yml. Same purpose as
+  # infra/k8s/31-prometheus.yaml, just without the Kubernetes pod discovery
+  # (not needed here - one instance per service, no replicas locally).
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Same provisioning (datasource + dashboard) as infra/k8s/32-grafana.yaml,
+  # mounted from local files instead of ConfigMaps.
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Same reasoning as 32-grafana.yaml: no route out to the internet from
+      # this stack is assumed, and the plugin preinstaller otherwise hangs.
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health | grep -q ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
 
   # ---------------------------------------------------------------------
   # Application services
@@ -208,6 +289,8 @@ services:
       - "8084:8084"
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_MAIL_HOST: mailpit
+      SPRING_MAIL_PORT: 1025
       AUTH_SERVICE_BASE_URL: http://auth-service:8081
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
     depends_on:
@@ -217,6 +300,8 @@ services:
         condition: service_started
       auth-service:
         condition: service_started
+      mailpit:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8084/actuator/health"]
       interval: 10s

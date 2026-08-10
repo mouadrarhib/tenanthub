@@ -1,0 +1,25 @@
+# Static scrape config for the Docker Compose stack - one instance per
+# service here (no replicas like in k8s), so plain static_configs targets by
+# Compose hostname:port are enough; no need for the Kubernetes pod-discovery
+# relabeling that infra/k8s/31-prometheus.yaml uses.
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'tenanthub-services'
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - 'discovery-service:8761'
+          - 'auth-service:8081'
+          - 'tenant-service:8082'
+          - 'project-service:8083'
+          - 'notification-service:8084'
+          - 'billing-service:8085'
+          - 'gateway-service:8080'
+        labels:
+          job: 'tenanthub-services'
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: '([^:]+):.*'
+        target_label: job
