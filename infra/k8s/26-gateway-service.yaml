@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: gateway-service
-          image: tenanthub/gateway-service:latest
+          image: infra-gateway-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

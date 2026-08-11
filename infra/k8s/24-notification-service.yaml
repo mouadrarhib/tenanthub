@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: notification-service
-          image: tenanthub/notification-service:latest
+          image: infra-notification-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8084

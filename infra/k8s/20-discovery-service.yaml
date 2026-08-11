@@ -1,9 +1,8 @@
-# Images referenced below (tenanthub/<service>:latest) are built locally via
-# each service's Dockerfile (docker build -f <service>/Dockerfile -t
-# tenanthub/<service>:latest .  from the repo root) and are not pushed to a
-# registry - for a local cluster, load them in first:
-#   kind load docker-image tenanthub/discovery-service:latest --name <cluster>
-#   # or: minikube image load tenanthub/discovery-service:latest
+# Images referenced below (infra-<service>:latest) are built locally by
+# `docker compose build` in infra/ (compose names images
+# <project-dir>-<service>, hence the infra- prefix) and are not pushed to a
+# registry. Docker Desktop's Kubernetes node picks them up automatically via
+# its containerd registry mirror - no `kind load` needed.
 #
 # Single replica - Eureka here is a demo-scale service registry, not a
 # highly-available cluster (application.yml already sets
@@ -31,7 +30,7 @@ spec:
     spec:
       containers:
         - name: discovery-service
-          image: tenanthub/discovery-service:latest
+          image: infra-discovery-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8761

@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: auth-service
-          image: tenanthub/auth-service:latest
+          image: infra-auth-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8081

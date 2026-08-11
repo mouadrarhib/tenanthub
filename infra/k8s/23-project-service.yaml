@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: project-service
-          image: tenanthub/project-service:latest
+          image: infra-project-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8083
