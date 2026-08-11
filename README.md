@@ -213,10 +213,10 @@ A few of what's in there:
 </tr>
 <tr>
 <td width="50%"><img src="screenshots/k8s/k8s_self_healing.png" alt="Kubernetes self-healing"/><br/><sub><b>Kubernetes</b> — deleting a pod, watching the Deployment replace it automatically</sub></td>
-<td width="50%"><img src="screenshots/Spring boot/eureka.png" alt="Eureka dashboard"/><br/><sub><b>Eureka</b> — all 6 app services registered and UP</sub></td>
+<td width="50%"><img src="screenshots/Spring%20boot/eureka.png" alt="Eureka dashboard"/><br/><sub><b>Eureka</b> — all 6 app services registered and UP</sub></td>
 </tr>
 <tr>
-<td width="50%"><img src="screenshots/Kafka&MailPit/kafka_dashboard.png" alt="Kafka UI dashboard"/><br/><sub><b>Kafka</b> — topics, partitions, and consumer groups</sub></td>
+<td width="50%"><img src="screenshots/Kafka%26MailPit/kafka_dashboard.png" alt="Kafka UI dashboard"/><br/><sub><b>Kafka</b> — topics, partitions, and consumer groups</sub></td>
 <td width="50%"><img src="screenshots/Grafana_prometheus/grafana_overview.png" alt="Grafana Request/Error Rate dashboard"/><br/><sub><b>Grafana</b> — a real outage caught live on the Error Rate panel</sub></td>
 </tr>
 </table>
