@@ -1,0 +1,138 @@
+# Kafka & Mailpit in TenantHub
+
+Kafka is the async event bus connecting services that shouldn't know about each
+other directly. Mailpit is where the *result* of one of those event chains — a
+task-assignment email — actually lands in local/dev environments, without
+sending real mail anywhere.
+
+## Kafka — decoupling services with events
+
+Three services publish events; two other services consume them. Nobody calls
+anybody's REST API for this — it's all one-way, fire-and-forget messages through
+Kafka.
+
+```mermaid
+flowchart LR
+    subgraph Producers
+        TS[tenant-service]
+        PS[project-service]
+    end
+
+    TS -- tenant.created --> K[(Kafka)]
+    PS -- project.created --> K
+    PS -- task.created --> K
+    PS -- task.assigned --> K
+
+    K -- tenant.created --> BS[billing-service<br/>UsageTrackingService]
+    K -- project.created --> BS
+    K -- task.assigned --> NS[notification-service<br/>sends email via Mailpit]
+
+    style K fill:#231f20,color:#fff,stroke:#333
+```
+
+| Topic | Producer | Consumer | What happens |
+|---|---|---|---|
+| `tenant.created` | tenant-service | billing-service | Records tenant usage against its plan |
+| `project.created` | project-service | billing-service | Increments `projects_count` usage |
+| `task.created` | project-service | *(none yet)* | Published, not currently consumed |
+| `task.assigned` | project-service | notification-service | Looks up the assignee's email via auth-service, sends the notification |
+
+This is why billing-service never has to know project-service exists, and
+project-service never has to know an email even gets sent — each side only
+knows about the event, not the other service.
+
+### Kafka UI: cluster overview
+
+One broker, one cluster (`tenanthub`), 54 partitions across 5 topics
+(4 business topics + the internal `__consumer_offsets`):
+
+![Kafka UI dashboard](../screenshots/Kafka&MailPit/kafka_dashboard.png)
+
+### Topics list
+
+```mermaid
+flowchart LR
+    subgraph Topics
+        direction TB
+        T1["tenant.created<br/>3 messages"]
+        T2["project.created<br/>3 messages"]
+        T3["task.created<br/>16 messages"]
+        T4["task.assigned<br/>5 messages"]
+    end
+```
+
+![Kafka topics list](../screenshots/Kafka&MailPit/kafka_topic.png)
+
+### Inspecting real messages
+
+`project.created` — each message keyed by the project's own id, value is the
+full `ProjectCreatedEvent` JSON:
+
+![project.created messages](../screenshots/Kafka&MailPit/kafka_project_messages.png)
+
+`task.assigned` — same pattern, keyed by `taskId`:
+
+![task.assigned messages](../screenshots/Kafka&MailPit/kafka_tasks_messages.png)
+
+### Consumer groups
+
+Confirms who's actually listening: `billing-service` is subscribed to 2 topics
+(`tenant.created` + `project.created`), `notification-service` to 1
+(`task.assigned`) — both `STABLE`, meaning they're connected and healthy, no
+rebalancing in progress:
+
+![Kafka consumer groups](../screenshots/Kafka&MailPit/kafka_consumers.png)
+
+### Broker config
+
+The single KRaft broker's runtime config (default values, single-node demo
+setup — no replication, no Zookeeper):
+
+![Kafka broker config](../screenshots/Kafka&MailPit/kafka_config.png)
+
+## Mailpit — where task-assignment emails land
+
+`notification-service` sends real SMTP messages via `JavaMailSender` — the only
+thing that's different in dev is *where* they go. Instead of a real mail
+provider, `SPRING_MAIL_HOST`/`SPRING_MAIL_PORT` point at Mailpit, a fake SMTP
+server that catches every email instead of delivering it anywhere.
+
+```mermaid
+sequenceDiagram
+    participant PS as project-service
+    participant K as Kafka (task.assigned)
+    participant NS as notification-service
+    participant Auth as auth-service
+    participant MP as Mailpit (fake SMTP)
+
+    PS->>K: publish TaskAssignedEvent
+    K->>NS: @KafkaListener delivers it
+    NS->>Auth: GET /internal/users/{id}
+    Auth-->>NS: assignee's email
+    NS->>MP: SMTP send
+    MP-->>NS: 250 OK (accepted, not delivered anywhere real)
+```
+
+### Inbox
+
+Every task-assignment email shows up here instantly — nothing ever leaves the
+machine:
+
+![Mailpit inbox](../screenshots/Kafka&MailPit/mailpit_mailbox.png)
+
+### Message content
+
+Click into one to see the full rendered email — subject, body, headers, and
+the `Return-Path` (`spring@<container-id>`, since it's the JVM's own hostname,
+not a real domain):
+
+![Mailpit message content](../screenshots/Kafka&MailPit/mailpit_message_content.png)
+
+## Why these two exist together in one doc
+
+They're two ends of the same flow: **Kafka carries the event that says a task
+was assigned; Mailpit is where the side effect of that event (the email)
+becomes visible.** Watching a message land in `task.assigned` in Kafka UI and
+then immediately seeing the matching email appear in Mailpit's inbox is the
+fastest way to confirm the whole async chain — publish → consume → external
+call → send — actually works end to end.
