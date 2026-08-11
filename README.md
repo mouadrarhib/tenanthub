@@ -28,7 +28,7 @@ tenant isolation, JWT auth, async messaging, and production-grade observability.
 - [Database Design](#database-design)
 - [Use Cases](#use-cases)
 - [Event Flow — A Worked Example](#event-flow--a-worked-example)
-- [Project Status](#project-status)
+- [Resources](#resources)
 - [Getting Started](#getting-started)
 - [Repository Structure](#repository-structure)
 
@@ -131,7 +131,7 @@ evolve independently.
 | Caching | Redis |
 | Build | Maven — multi-module monorepo |
 | Observability | Spring Boot Actuator, Micrometer, Prometheus, Grafana |
-| Containerization | Docker, Kubernetes *(planned)* |
+| Containerization | Docker (Compose), Kubernetes |
 
 ## Database Design
 
@@ -189,24 +189,37 @@ never calls Notification or Billing Service directly, and never waits on them �
 publishes the event and moves on. Adding a fourth listener tomorrow requires zero changes
 to Project Service's code.
 
-## Project Status
+## Resources
 
-This repository currently reflects the **scaffolding phase**: all 7 services and the
-shared library module are generated, wired into a Maven multi-module build, and
-configured with their intended dependencies — no business logic yet.
+Deeper, screenshot-backed documentation for each operational piece lives in `docs/` —
+written against the actual running stack, not just the manifests:
 
-| Phase | Focus | Status |
-|---|---|---|
-| P0 | Foundations — repo, monorepo structure, module scaffolding | ✅ Done |
-| P1 | Project Service — CRUD, JPA, validation (standalone) | 🔜 Next |
-| P2 | Auth Service — JWT issuance, wired into Project Service | ⏳ Planned |
-| P3 | Tenant Service — signup, tenant scoping everywhere | ⏳ Planned |
-| P4 | Kafka — Notification & Billing Service as event consumers | ⏳ Planned |
-| P5 | Gateway + Eureka — single entry point, service discovery | ⏳ Planned |
-| P6 | Docker + Kubernetes | ⏳ Planned |
-| P7 | Observability — Prometheus + Grafana dashboards | ⏳ Planned |
-| P8 | Frontend — minimal UI | ⏳ Planned |
-| P9 | Polish & ship | ⏳ Planned |
+| Doc | Covers |
+|---|---|
+| [`docs/docker.md`](docs/docker.md) | The 17-container Compose stack — build vs. pulled images, startup order, volumes |
+| [`docs/kubernetes.md`](docs/kubernetes.md) | `infra/k8s/` manifests on Docker Desktop — image gotchas, scaling, self-healing |
+| [`docs/eureka.md`](docs/eureka.md) | Service registry — how the gateway looks up instances, why restarts cause transient 503s |
+| [`docs/kafka-mailpit.md`](docs/kafka-mailpit.md) | Event topics, consumer groups, a task-assignment email landing in Mailpit |
+| [`docs/redis.md`](docs/redis.md) | Token-bucket rate limiting shared across gateway replicas |
+| [`docs/prometheus-grafana.md`](docs/prometheus-grafana.md) | Metrics scraping, the Request Rate / Error Rate dashboard, a captured live outage |
+| [`docs/apis.md`](docs/apis.md) | Per-service Swagger UI, which endpoints are public vs. JWT-protected |
+
+A few of what's in there:
+
+<table>
+<tr>
+<td width="50%"><img src="screenshots/Docker/docker_containers.png" alt="Docker Desktop containers"/><br/><sub><b>Docker</b> — all 17 containers in the Compose stack</sub></td>
+<td width="50%"><img src="screenshots/k8s/pods_health.png" alt="Kubernetes pods healthy"/><br/><sub><b>Kubernetes</b> — the same stack on Docker Desktop's cluster, every pod healthy</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="screenshots/k8s/k8s_self_healing.png" alt="Kubernetes self-healing"/><br/><sub><b>Kubernetes</b> — deleting a pod, watching the Deployment replace it automatically</sub></td>
+<td width="50%"><img src="screenshots/Spring boot/eureka.png" alt="Eureka dashboard"/><br/><sub><b>Eureka</b> — all 6 app services registered and UP</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="screenshots/Kafka&MailPit/kafka_dashboard.png" alt="Kafka UI dashboard"/><br/><sub><b>Kafka</b> — topics, partitions, and consumer groups</sub></td>
+<td width="50%"><img src="screenshots/Grafana_prometheus/grafana_overview.png" alt="Grafana Request/Error Rate dashboard"/><br/><sub><b>Grafana</b> — a real outage caught live on the Error Rate panel</sub></td>
+</tr>
+</table>
 
 ## Getting Started
 
@@ -226,8 +239,9 @@ cp auth-service/src/main/resources/application.yml.example \
 mvn clean install
 ```
 
-A full local stack (Postgres, Kafka, Redis, Eureka, all services via Docker Compose) is
-planned for Phase P6 — see `infra/docker-compose.yml`.
+A full local stack (Postgres, Kafka, Redis, Eureka, all services) runs via
+`infra/docker-compose.yml`, or on Kubernetes via the manifests in `infra/k8s/` — see
+[`docs/docker.md`](docs/docker.md) and [`docs/kubernetes.md`](docs/kubernetes.md).
 
 ## Repository Structure
 
