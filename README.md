@@ -51,41 +51,43 @@ Kafka, service discovery, and observability, not just a CRUD API with extra step
 ```mermaid
 flowchart TD
     Client([Client / Frontend]) --> GW[["🚪 API Gateway<br/>(Spring Cloud Gateway)"]]
+    GW --> REDIS[("Redis<br/>cache + rate limit")]
 
-    GW --> AUTH[Auth Service]
-    GW --> TEN[Tenant Service]
-    GW --> PROJ[Project Service]
+    subgraph App["Application Services"]
+        direction LR
+        AUTH[Auth Service]
+        TEN[Tenant Service]
+        PROJ[Project Service]
+        NOTIF[Notification Service]
+        BILL[Billing Service]
+    end
+
+    GW --> AUTH
+    GW --> TEN
+    GW --> PROJ
 
     PROJ -- publishes events --> KAFKA[("📨 Kafka")]
-    KAFKA --> NOTIF[Notification Service]
-    KAFKA --> BILL[Billing Service]
-
-    AUTH -.registers.-> EUREKA{{Discovery / Eureka}}
-    TEN -.registers.-> EUREKA
-    PROJ -.registers.-> EUREKA
-    NOTIF -.registers.-> EUREKA
-    BILL -.registers.-> EUREKA
-    GW -.registers.-> EUREKA
-
-    GW --> REDIS[("Redis<br/>cache + rate limit")]
+    KAFKA --> NOTIF
+    KAFKA --> BILL
 
     AUTH --> AUTHDB[(auth_db)]
     TEN --> TENDB[(tenant_db)]
     PROJ --> PROJDB[(project_db)]
     BILL --> BILLDB[(billing_db)]
 
-    PROM[Prometheus + Grafana] -.scrapes /actuator.-> AUTH
-    PROM -.scrapes /actuator.-> TEN
-    PROM -.scrapes /actuator.-> PROJ
-    PROM -.scrapes /actuator.-> NOTIF
-    PROM -.scrapes /actuator.-> BILL
+    App -.registers.-> EUREKA{{Discovery / Eureka}}
+    GW -.registers.-> EUREKA
+
+    PROM[Prometheus + Grafana] -.scrapes /actuator.-> App
     PROM -.scrapes /actuator.-> GW
 ```
 
 Every box is its own Spring Boot application, with its own database, and (eventually) its
 own Docker container. Requests come in through one door (the Gateway); side effects fan
 out through Kafka to whichever services care, without the originating service ever
-knowing who's listening.
+knowing who's listening. All 6 app services register with Eureka and get scraped by
+Prometheus the same way — grouped here as one box so the diagram shows the pattern once
+instead of six crossing lines.
 
 ## Services
 
