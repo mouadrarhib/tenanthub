@@ -23,3 +23,23 @@ scrape_configs:
       - source_labels: [__address__]
         regex: '([^:]+):.*'
         target_label: job
+
+  # jmx_prometheus_javaagent attached to the kafka container via KAFKA_OPTS
+  # (see infra/docker-compose.yml) - exposes broker JMX metrics as plain
+  # Prometheus text on 7071, so no /actuator/prometheus-style path needed.
+  - job_name: 'kafka-broker'
+    static_configs:
+      - targets:
+          - 'kafka:7071'
+        labels:
+          job: 'kafka-broker'
+
+  # kafka-lag-exporter (see infra/docker-compose.yml) - real per-consumer-
+  # group lag computed via the Kafka Admin API, not available through the
+  # jmx-exporter job above since brokers don't expose group lag over JMX.
+  - job_name: 'kafka-lag-exporter'
+    static_configs:
+      - targets:
+          - 'kafka-lag-exporter:8000'
+        labels:
+          job: 'kafka-lag-exporter'

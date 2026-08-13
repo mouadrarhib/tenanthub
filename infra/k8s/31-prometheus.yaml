@@ -73,6 +73,18 @@ data:
             target_label: job
           - source_labels: [__meta_kubernetes_pod_name]
             target_label: pod
+
+      # jmx_prometheus_javaagent attached to the kafka Deployment via
+      # KAFKA_OPTS (see infra/k8s/15-kafka.yaml) - kafka isn't one of the 7
+      # app-service pods above, so it needs its own static target rather than
+      # the label-based pod discovery. The kafka Service resolves within the
+      # namespace by its short name, same as any other in-cluster DNS lookup.
+      - job_name: 'kafka-broker'
+        static_configs:
+          - targets:
+              - 'kafka:7071'
+            labels:
+              job: 'kafka-broker'
 ---
 apiVersion: apps/v1
 kind: Deployment

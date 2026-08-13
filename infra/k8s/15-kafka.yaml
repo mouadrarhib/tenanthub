@@ -1,3 +1,103 @@
+# Same jmx_prometheus_javaagent rule set as
+# infra/kafka-jmx-exporter/kafka-jmx-exporter-config.yml (compose's version) -
+# kept in sync by hand, since a ConfigMap needs the content inline rather than
+# a file reference. Broker-side rules from the prometheus/jmx_exporter
+# project's example_configs/kafka-2_0_0.yml, not hand-written selectors.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-jmx-exporter-config
+  namespace: tenanthub
+data:
+  kafka-jmx-exporter-config.yml: |
+    lowercaseOutputName: true
+    rules:
+      # Special cases and very specific rules
+      - pattern: kafka.server<type=(.+), name=(.+), clientId=(.+), topic=(.+), partition=(.*)><>Value
+        name: kafka_server_$1_$2
+        type: GAUGE
+        labels:
+          clientId: "$3"
+          topic: "$4"
+          partition: "$5"
+      - pattern: kafka.server<type=(.+), name=(.+), clientId=(.+), brokerHost=(.+), brokerPort=(.+)><>Value
+        name: kafka_server_$1_$2
+        type: GAUGE
+        labels:
+          clientId: "$3"
+          broker: "$4:$5"
+      - pattern: kafka.coordinator.(\w+)<type=(.+), name=(.+)><>Value
+        name: kafka_coordinator_$1_$2_$3
+        type: GAUGE
+
+      # Generic per-second counters with 0-2 key/value pairs
+      # (this is what surfaces MessagesInPerSec, BytesInPerSec, BytesOutPerSec)
+      - pattern: kafka.(\w+)<type=(.+), name=(.+)PerSec\w*, (.+)=(.+), (.+)=(.+)><>Count
+        name: kafka_$1_$2_$3_total
+        type: COUNTER
+        labels:
+          "$4": "$5"
+          "$6": "$7"
+      - pattern: kafka.(\w+)<type=(.+), name=(.+)PerSec\w*, (.+)=(.+)><>Count
+        name: kafka_$1_$2_$3_total
+        type: COUNTER
+        labels:
+          "$4": "$5"
+      - pattern: kafka.(\w+)<type=(.+), name=(.+)PerSec\w*><>Count
+        name: kafka_$1_$2_$3_total
+        type: COUNTER
+
+      # Generic gauges with 0-2 key/value pairs
+      - pattern: kafka.(\w+)<type=(.+), name=(.+), (.+)=(.+), (.+)=(.+)><>Value
+        name: kafka_$1_$2_$3
+        type: GAUGE
+        labels:
+          "$4": "$5"
+          "$6": "$7"
+      - pattern: kafka.(\w+)<type=(.+), name=(.+), (.+)=(.+)><>Value
+        name: kafka_$1_$2_$3
+        type: GAUGE
+        labels:
+          "$4": "$5"
+      - pattern: kafka.(\w+)<type=(.+), name=(.+)><>Value
+        name: kafka_$1_$2_$3
+        type: GAUGE
+
+      # Emulate Prometheus 'Summary' metrics for the exported 'Histogram's.
+      # Note that these are missing the '_sum' metric.
+      - pattern: kafka.(\w+)<type=(.+), name=(.+), (.+)=(.+), (.+)=(.+)><>Count
+        name: kafka_$1_$2_$3_count
+        type: COUNTER
+        labels:
+          "$4": "$5"
+          "$6": "$7"
+      - pattern: kafka.(\w+)<type=(.+), name=(.+), (.+)=(.+), (.+)=(.+)><>(\d+)thPercentile
+        name: kafka_$1_$2_$3
+        type: GAUGE
+        labels:
+          "$4": "$5"
+          "$6": "$7"
+          quantile: "0.$7"
+      - pattern: kafka.(\w+)<type=(.+), name=(.+), (.+)=(.+)><>Count
+        name: kafka_$1_$2_$3_count
+        type: COUNTER
+        labels:
+          "$4": "$5"
+      - pattern: kafka.(\w+)<type=(.+), name=(.+), (.+)=(.+)><>(\d+)thPercentile
+        name: kafka_$1_$2_$3
+        type: GAUGE
+        labels:
+          "$4": "$5"
+          quantile: "0.$5"
+      - pattern: kafka.(\w+)<type=(.+), name=(.+)><>Count
+        name: kafka_$1_$2_$3_count
+        type: COUNTER
+      - pattern: kafka.(\w+)<type=(.+), name=(.+)><>(\d+)thPercentile
+        name: kafka_$1_$2_$3
+        type: GAUGE
+        labels:
+          quantile: "0.$4"
+---
 # Single-node Kafka in KRaft mode (combined broker+controller), same image
 # and config as infra/docker-compose.yml. No PVC - topic data is ephemeral,
 # fine for a demo cluster; a real deployment would use a managed Kafka
@@ -17,12 +117,27 @@ spec:
       labels:
         app: kafka
     spec:
+      # No custom Kafka image just to bake in the jmx_exporter jar - an
+      # initContainer fetches the same pinned version compose uses
+      # (jmx_prometheus_javaagent 0.20.0) into a shared emptyDir instead.
+      initContainers:
+        - name: fetch-jmx-exporter
+          image: curlimages/curl:8.10.1
+          command:
+            - sh
+            - -c
+            - curl -sSL -o /jmx-exporter/jmx_prometheus_javaagent-0.20.0.jar
+              https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/0.20.0/jmx_prometheus_javaagent-0.20.0.jar
+          volumeMounts:
+            - name: jmx-exporter
+              mountPath: /jmx-exporter
       containers:
         - name: kafka
           image: apache/kafka:3.9.0
           ports:
             - containerPort: 9092
             - containerPort: 9093
+            - containerPort: 7071
           env:
             - name: KAFKA_NODE_ID
               value: "1"
@@ -42,9 +157,26 @@ spec:
               value: "PLAINTEXT"
             - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
               value: "1"
+            # kafka-run-class.sh passes KAFKA_OPTS straight through to the
+            # JVM command line - same mechanism as compose's KAFKA_OPTS, just
+            # pointed at the initContainer-fetched jar and the ConfigMap-
+            # mounted rules file instead of a bind mount.
+            - name: KAFKA_OPTS
+              value: "-javaagent:/opt/jmx-exporter/jmx_prometheus_javaagent-0.20.0.jar=7071:/opt/jmx-exporter-config/kafka-jmx-exporter-config.yml"
+          volumeMounts:
+            - name: jmx-exporter
+              mountPath: /opt/jmx-exporter
+            - name: jmx-exporter-config
+              mountPath: /opt/jmx-exporter-config
           resources:
             requests: { memory: "512Mi", cpu: "250m" }
             limits: { memory: "1Gi", cpu: "700m" }
+      volumes:
+        - name: jmx-exporter
+          emptyDir: {}
+        - name: jmx-exporter-config
+          configMap:
+            name: kafka-jmx-exporter-config
 ---
 apiVersion: v1
 kind: Service
@@ -61,3 +193,6 @@ spec:
     - name: controller
       port: 9093
       targetPort: 9093
+    - name: jmx-exporter
+      port: 7071
+      targetPort: 7071

@@ -100,8 +100,10 @@ services:
       retries: 10
 
   # Single-node Kafka in KRaft mode (combined broker+controller) - no
-  # Zookeeper needed. Internal-only: nothing outside the compose network
-  # needs to talk to it, so no host port is published.
+  # Zookeeper needed. Internal-only for the Kafka protocol port (9092) -
+  # nothing outside the compose network talks to that. The JMX-to-Prometheus
+  # exporter port (7071) below *is* published, same as the other scrape
+  # targets, so the host-side Prometheus UI/debugging can hit it directly.
   kafka:
     image: apache/kafka:3.9.0
     restart: unless-stopped
@@ -115,6 +117,39 @@ services:
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      # kafka-run-class.sh passes KAFKA_OPTS straight through to the JVM
+      # command line, so this is enough to attach the jmx_exporter javaagent
+      # without a custom image - it starts its own HTTP server on 7071
+      # (config below), separate from Kafka's own JMX port.
+      KAFKA_OPTS: "-javaagent:/opt/jmx-exporter/jmx_prometheus_javaagent-0.20.0.jar=7071:/opt/jmx-exporter/kafka-jmx-exporter-config.yml"
+    ports:
+      - "7071:7071"
+    volumes:
+      - ./kafka-jmx-exporter/jmx_prometheus_javaagent-0.20.0.jar:/opt/jmx-exporter/jmx_prometheus_javaagent-0.20.0.jar:ro
+      - ./kafka-jmx-exporter/kafka-jmx-exporter-config.yml:/opt/jmx-exporter/kafka-jmx-exporter-config.yml:ro
+
+  # Real per-consumer-group lag, unlike the JMX exporter above - it talks the
+  # Kafka protocol directly (Admin API) to compute lag per group/topic/
+  # partition, which isn't something the broker exposes over JMX at all.
+  # group-whitelist = [".*"] in application.conf watches every group, so both
+  # billing-service and notification-service show up without hardcoding either.
+  kafka-lag-exporter:
+    image: seglo/kafka-lag-exporter:0.8.2
+    restart: unless-stopped
+    command: ["/opt/docker/bin/kafka-lag-exporter", "-Dconfig.file=/opt/docker/conf/application.conf"]
+    environment:
+      # Works around a JDK 17 bug (cgroup v2 detection NPEs under Docker
+      # Desktop's VM) that otherwise crashes the app before its Prometheus
+      # endpoint ever binds - disables JVM container-resource auto-detection,
+      # which this exporter doesn't need anyway.
+      JAVA_OPTS: "-XX:-UseContainerSupport"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./kafka-lag-exporter/application.conf:/opt/docker/conf/application.conf:ro
+    depends_on:
+      kafka:
+        condition: service_started
 
   # Dev-only browser UI for inspecting Kafka topics/messages. Not part of
   # the application - safe to remove, exists purely for local debugging.
