@@ -150,6 +150,39 @@ whole time since it was never touched:
 
 ![kafka_consumergroup_group_sum_lag graphed over time](../screenshots/Kafka&MailPit/kafka_consumergroup_group_topic_sum_lag.png)
 
+### TenantHub — Kafka dashboard
+
+Provisioned the same way as the app-services Overview dashboard - JSON in
+`infra/grafana/dashboards/`, auto-loaded on startup, no manual "import
+dashboard" step. Five panels: offset-count lag by group and by topic,
+broker throughput (messages/sec and bytes in/out by topic), and time-lag by
+topic.
+
+That last panel deliberately queries the **per-topic** metric
+(`kafka_consumergroup_group_lag_seconds`, `max by (topic)`) rather than
+`kafka_consumergroup_group_max_lag_seconds`. The group-level max was found to
+be misleading - it's a `max()` across every topic-partition a group consumes,
+so a stale extrapolation on a low-traffic topic (`tenant.created`,
+`project.created` - see below) could drag the reported number up even when
+the topic actually being watched (`task.created`) was fully caught up. This
+is a documented, maintainer-acknowledged limitation of `kafka-lag-exporter`'s
+interpolation approach on idle partitions
+([#121](https://github.com/seglo/kafka-lag-exporter/issues/121),
+[#37](https://github.com/seglo/kafka-lag-exporter/issues/37)), not something
+fixable on the query side beyond switching to the per-topic metric - the
+panel description on "Time Lag (seconds) by Topic" links both issues.
+
+Captured live, stopping `billing-service`, publishing 5 tasks, then letting
+it catch back up: **Consumer Lag by Group/Topic** and **Messages/Bytes**
+spike together around 18:25 and drop the instant the backlog is consumed.
+**Time Lag (seconds) by Topic** (bottom panel) shows the same story from a
+different angle - `task.created`'s line climbs in the expected staircase
+(each point is one 30s `kafka-lag-exporter` poll) while the backlog exists,
+then drops cleanly back to `0` once caught up, with no interference from
+`tenant.created`/`project.created` sitting quietly at `NaN` the whole time:
+
+![TenantHub — Kafka dashboard, lag spike and recovery](../screenshots/Kafka&MailPit/kafka_grafana_dashboard_lag_recovery.png)
+
 ## Mailpit — where task-assignment emails land
 
 `notification-service` sends real SMTP messages via `JavaMailSender` — the only
