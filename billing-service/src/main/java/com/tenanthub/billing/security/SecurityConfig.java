@@ -52,6 +52,8 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**", "/error",
                                 "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
                         .permitAll()
+                        // Same ADMIN-role convention as project-service's destructive endpoints.
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt
                         .decoder(jwtDecoder)
