@@ -31,6 +31,7 @@ jobs:
             shared:
               - 'pom.xml'
               - 'shared-events/**'
+              - '.github/workflows/cd.yml'
             auth-service:
               - 'auth-service/**'
             tenant-service:

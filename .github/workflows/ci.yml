@@ -30,6 +30,7 @@ jobs:
             shared:
               - 'pom.xml'
               - 'shared-events/**'
+              - '.github/workflows/ci.yml'
             auth-service:
               - 'auth-service/**'
             tenant-service:
@@ -106,20 +107,26 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
+      - name: Copy application.yml.example to application.yml for all services
+        if: steps.check.outputs.run_test == 'true'
+        run: |
+          for file in */src/main/resources/application.yml.example; do
+            if [ -f "$file" ]; then
+              cp "$file" "${file%.example}"
+            fi
+          done
+
       - name: Initialize PostgreSQL Test Databases
         if: steps.check.outputs.run_test == 'true'
         run: |
-          PGPASSWORD=changeme psql -h localhost -U postgres -c "CREATE DATABASE auth_db;" || true
-          PGPASSWORD=changeme psql -h localhost -U postgres -c "CREATE DATABASE tenant_db;" || true
-          PGPASSWORD=changeme psql -h localhost -U postgres -c "CREATE DATABASE tenanthub_project;" || true
-          PGPASSWORD=changeme psql -h localhost -U postgres -c "CREATE DATABASE tenanthub_billing;" || true
+          PGPASSWORD=changeme psql -h 127.0.0.1 -p 5432 -U postgres -c "CREATE DATABASE auth_db;" || true
+          PGPASSWORD=changeme psql -h 127.0.0.1 -p 5432 -U postgres -c "CREATE DATABASE tenant_db;" || true
+          PGPASSWORD=changeme psql -h 127.0.0.1 -p 5432 -U postgres -c "CREATE DATABASE tenanthub_project;" || true
+          PGPASSWORD=changeme psql -h 127.0.0.1 -p 5432 -U postgres -c "CREATE DATABASE tenanthub_billing;" || true
 
       - name: Run Maven Tests (${{ matrix.service }})
         if: steps.check.outputs.run_test == 'true'
         run: mvn -B test -pl ${{ matrix.service }} -am
-        env:
-          SPRING_DATASOURCE_PASSWORD: changeme
-          JWT_SECRET: changeme-replace-with-a-strong-secret-key
 
   frontend-test:
     name: Build & Typecheck Frontend
