@@ -1,0 +1,111 @@
+name: CI (Continuous Integration)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  detect-changes:
+    name: Detect Changed Services
+    runs-on: ubuntu-latest
+    outputs:
+      shared: ${{ steps.filter.outputs.shared }}
+      auth-service: ${{ steps.filter.outputs.auth-service }}
+      tenant-service: ${{ steps.filter.outputs.tenant-service }}
+      project-service: ${{ steps.filter.outputs.project-service }}
+      notification-service: ${{ steps.filter.outputs.notification-service }}
+      billing-service: ${{ steps.filter.outputs.billing-service }}
+      gateway-service: ${{ steps.filter.outputs.gateway-service }}
+      discovery-service: ${{ steps.filter.outputs.discovery-service }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            shared:
+              - 'pom.xml'
+              - 'shared-events/**'
+            auth-service:
+              - 'auth-service/**'
+            tenant-service:
+              - 'tenant-service/**'
+            project-service:
+              - 'project-service/**'
+            notification-service:
+              - 'notification-service/**'
+            billing-service:
+              - 'billing-service/**'
+            gateway-service:
+              - 'gateway-service/**'
+            discovery-service:
+              - 'discovery-service/**'
+            frontend:
+              - 'frontend/**'
+
+  backend-test:
+    name: Test ${{ matrix.service }}
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - auth-service
+          - tenant-service
+          - project-service
+          - notification-service
+          - billing-service
+          - gateway-service
+          - discovery-service
+    steps:
+      - name: Check if service should be tested
+        id: check
+        run: |
+          if [ "${{ needs.detect-changes.outputs.shared }}" = "true" ] || [ "${{ needs.detect-changes.outputs[matrix.service] }}" = "true" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "run_test=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_test=false" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.run_test == 'true'
+
+      - name: Set up JDK 17 (Temurin)
+        if: steps.check.outputs.run_test == 'true'
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Run Maven Tests (${{ matrix.service }})
+        if: steps.check.outputs.run_test == 'true'
+        run: mvn -B test -pl ${{ matrix.service }} -am
+
+  frontend-test:
+    name: Build & Typecheck Frontend
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build and Typecheck
+        working-directory: frontend
+        run: npm run build
