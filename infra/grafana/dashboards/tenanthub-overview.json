@@ -34,6 +34,25 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "id": 3,
+      "title": "Average Latency (s by service)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum by (job) (rate(http_server_requests_seconds_sum[1m])) / sum by (job) (rate(http_server_requests_seconds_count[1m]))",
+          "legendFormat": "{{job}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
     }
   ]
 }

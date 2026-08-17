@@ -47,12 +47,19 @@ scraped:
 
 ![Prometheus target health](../screenshots/Grafana_prometheus/prometheus_target_health.png)
 
-## The dashboard: Request Rate and Error Rate
+## The Dashboards
 
-Two panels, both grouped by service (`job` label):
+### 1. TenantHub — Overview (RED Method)
 
-- **Request Rate** — `sum by (job) (rate(http_server_requests_seconds_count[1m]))`
-- **Error Rate** — same query filtered to `status=~"5.."` (5xx only)
+Three panels implementing the industry-standard **RED Method** (**R**ate, **E**rror, **D**uration/Latency), grouped by service (`job` label):
+
+- **Request Rate (Rate)** — `sum by (job) (rate(http_server_requests_seconds_count[1m]))`
+- **Error Rate (Errors)** — same query filtered to `status=~"5.."` (5xx only)
+- **Average Latency (Duration)** — `sum by (job) (rate(http_server_requests_seconds_sum[1m])) / sum by (job) (rate(http_server_requests_seconds_count[1m]))`
+
+### 2. TenantHub — Kafka
+
+Provides broker throughput and real-time per-consumer-group/topic lag metrics (detailed in [`docs/kafka-mailpit.md`](kafka-mailpit.md)).
 
 ```mermaid
 sequenceDiagram
