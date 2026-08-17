@@ -51,6 +51,29 @@ jobs:
     name: Test ${{ matrix.service }}
     needs: detect-changes
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: changeme
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
     strategy:
       fail-fast: false
       matrix:
@@ -83,9 +106,20 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
+      - name: Initialize PostgreSQL Test Databases
+        if: steps.check.outputs.run_test == 'true'
+        run: |
+          PGPASSWORD=changeme psql -h localhost -U postgres -c "CREATE DATABASE auth_db;" || true
+          PGPASSWORD=changeme psql -h localhost -U postgres -c "CREATE DATABASE tenant_db;" || true
+          PGPASSWORD=changeme psql -h localhost -U postgres -c "CREATE DATABASE tenanthub_project;" || true
+          PGPASSWORD=changeme psql -h localhost -U postgres -c "CREATE DATABASE tenanthub_billing;" || true
+
       - name: Run Maven Tests (${{ matrix.service }})
         if: steps.check.outputs.run_test == 'true'
         run: mvn -B test -pl ${{ matrix.service }} -am
+        env:
+          SPRING_DATASOURCE_PASSWORD: changeme
+          JWT_SECRET: changeme-replace-with-a-strong-secret-key
 
   frontend-test:
     name: Build & Typecheck Frontend
