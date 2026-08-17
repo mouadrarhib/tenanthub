@@ -59,7 +59,15 @@ Once CI passes, `cd.yml` packages the application for deployment:
 
 ---
 
-## 4. Workflow Specifications
+## 4. Container Registry (GHCR): Published Packages
+
+All 7 microservices are built and stored as immutable container packages under GitHub Container Registry (`ghcr.io/mouadrarhib/tenanthub-*`):
+
+![GHCR Published Packages](../screenshots/CICD/ghcr_packages.png)
+
+---
+
+## 5. Workflow Specifications
 
 | Workflow | File | Triggers | Key Responsibilities |
 |---|---|---|---|
